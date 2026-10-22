@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: medicare-booking
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.12.0
+      - key: MONGODB_URI
+        sync: false
