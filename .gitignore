@@ -1,7 +1,10 @@
 node_modules/
 *.log
 .freebuff/
+.env
+.env.local
 hospital.db-shm
 hospital.db-wal
 .DS_Store
 Thumbs.db
+

@@ -9,9 +9,19 @@ const express = require("express");
 const mongoose = require("mongoose");
 const { DatabaseSync } = require("node:sqlite");
 
+// Load .env if present (supported natively in Node.js 20.12+)
+try {
+  if (typeof process.loadEnvFile === "function") {
+    process.loadEnvFile();
+  }
+} catch {
+  // .env is optional
+}
+
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, "hospital.db");
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/medicare";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/booking";
+
 
 const app = express();
 app.use(express.json());

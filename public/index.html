@@ -394,28 +394,51 @@
     </form>
   </aside>
 
-  <!-- ============================== AUTH MODAL ============================== -->
-  <dialog id="authModal" class="modal modal-sm">
-    <div class="modal-card">
-      <div class="modal-head">
-        <h3 id="authTitle">Patient Sign in</h3>
-        <button class="icon-btn" id="authClose" aria-label="Close" type="button">✕</button>
-      </div>
-      <div class="auth-tabs" id="authTabs">
-        <button class="auth-tab active" data-authtab="login" type="button" id="tabLoginBtn">Patient Sign in</button>
-        <button class="auth-tab" data-authtab="register" type="button" id="tabRegisterBtn">Create account</button>
-      </div>
-      <p class="auth-msg" id="authMsg" hidden></p>
+  <!-- ============================== AUTH MODAL (centered, split) ============================== -->
+  <dialog id="authModal" class="auth-modal" aria-label="Account access">
+    <div class="auth-shell">
+      <aside class="auth-brand">
+        <button class="icon-btn auth-x" id="authClose" aria-label="Close" type="button">✕</button>
+        <div class="brand-glow" aria-hidden="true"></div>
+        <div class="auth-logo">✚</div>
+        <p class="auth-kicker">MediCare Hospital</p>
+        <h3 id="authTitle">Welcome back</h3>
+        <p class="auth-sub" id="authSub">Sign in to book appointments, pay online and track your visits.</p>
+        <ul class="brand-perks">
+          <li><span>⚡</span> Book a specialist slot in under 60 seconds</li>
+          <li><span>🔁</span> Free reschedules — even mid-emergency</li>
+          <li><span>🤖</span> Alex, the AI assistant, books for you</li>
+          <li><span>🔒</span> Hashed passwords & sandbox-secure payments</li>
+        </ul>
+        <div class="brand-stats">
+          <div><b>4.8★</b><span>patient rating</span></div>
+          <div><b>24×7</b><span>emergency care</span></div>
+          <div><b>9+</b><span>specialists</span></div>
+        </div>
+        <p class="brand-quote">“Booked my mom's cardiologist in 40 seconds — and Alex moved it when we had an emergency.” <i>— Priya M., patient</i></p>
+      </aside>
 
-      <form id="loginForm" class="auth-form">
+      <section class="auth-pane">
+        <div class="auth-tabs" id="authTabs">
+          <span class="auth-tab-pill" aria-hidden="true"></span>
+          <button class="auth-tab active" data-authtab="login" type="button" id="tabLoginBtn">Sign in</button>
+          <button class="auth-tab" data-authtab="register" type="button" id="tabRegisterBtn">Create account</button>
+        </div>
+      <p class="auth-msg" id="authMsg" role="status" aria-live="polite" hidden></p>
+
+      <form id="loginForm" class="auth-form" novalidate>
         <div class="field"><label for="liEmail">Email</label>
           <input id="liEmail" type="email" class="input" required placeholder="you@example.com" autocomplete="email" /></div>
         <div class="field"><label for="liPass">Password</label>
-          <input id="liPass" type="password" class="input" required placeholder="••••••••" autocomplete="current-password" /></div>
+          <div class="pass-wrap">
+            <input id="liPass" type="password" class="input" required placeholder="••••••••" autocomplete="current-password" />
+            <button type="button" class="eye-btn" data-eye="liPass" aria-label="Show password">Show</button>
+          </div></div>
         <button class="btn btn-primary btn-lg" type="submit" id="authSubmitBtn">Sign in</button>
+        <p class="hint auth-switch" id="authSwitch">New to MediCare? <button type="button" class="link-btn" data-authtab="register">Create an account</button></p>
       </form>
 
-      <form id="registerForm" class="auth-form" hidden>
+      <form id="registerForm" class="auth-form" hidden novalidate>
         <div class="field"><label for="rgName">Full name</label>
           <input id="rgName" class="input" required placeholder="e.g. Aarav Patel" autocomplete="name" /></div>
         <div class="field"><label for="rgEmail">Email</label>
@@ -423,13 +446,18 @@
         <div class="field"><label for="rgPhone">Phone (optional)</label>
           <input id="rgPhone" class="input" placeholder="+91 98123 45678" autocomplete="tel" /></div>
         <div class="field"><label for="rgPass">Password</label>
-          <input id="rgPass" type="password" class="input" required minlength="6" placeholder="At least 6 characters" autocomplete="new-password" /></div>
+          <div class="pass-wrap">
+            <input id="rgPass" type="password" class="input" required minlength="6" placeholder="At least 6 characters" autocomplete="new-password" />
+            <button type="button" class="eye-btn" data-eye="rgPass" aria-label="Show password">Show</button>
+          </div>
+          <p class="hint" id="rgHint">Minimum 6 characters.</p></div>
         <button class="btn btn-primary btn-lg" type="submit">Create account</button>
+        <p class="hint auth-switch" id="authSwitch2">Already have an account? <button type="button" class="link-btn" data-authtab="login">Sign in</button></p>
       </form>
 
       <!-- PATIENT LOGIN HINT (Default: ONLY shows patient) -->
       <div class="auth-hint" id="patientAuthHint">
-        <strong>Demo Patient Login:</strong>
+        <strong>Demo accounts — one tap signs you in</strong>
         <button type="button" class="btn-demo" data-demo="patient">👤 Demo Patient · demo@medicare.local / demo1234</button>
         <div class="auth-switch-row">
           <span>Hospital Staff or Doctor?</span>
@@ -446,6 +474,7 @@
           <button type="button" class="btn-switch-portal" id="toPatientLogin">← Back to Patient Sign in</button>
         </div>
       </div>
+      </section>
     </div>
   </dialog>
 

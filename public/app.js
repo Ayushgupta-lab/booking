@@ -114,6 +114,21 @@ function renderUser() {
 }
 
 let authMode = "patient"; // "patient" | "admin"
+let authTab = "login";      // "login" | "register"
+
+function authTitleText() {
+  return authMode === "admin" ? "🔐 Admin sign-in"
+    : authTab === "register" ? "Create your account" : "Welcome back";
+}
+function applyAuthHeaders() {
+  $("#authTitle").textContent = authTitleText();
+  const sub = $("#authSub");
+  if (sub) {
+    if (authMode === "admin") sub.textContent = "Staff & doctor access — manage bookings, slots and the team.";
+    else if (authTab === "register") sub.textContent = "One account for faster booking, payments and your visit history.";
+    else sub.textContent = "Sign in to book appointments, pay online and track your visits.";
+  }
+}
 
 function setAuthMode(mode) {
   authMode = mode;
@@ -121,26 +136,25 @@ function setAuthMode(mode) {
   const tabs = $("#authTabs");
   const pHint = $("#patientAuthHint");
   const aHint = $("#adminAuthHint");
-  const title = $("#authTitle");
   const m = $("#authMsg");
   if (m) m.hidden = true;
 
   if (isAdm) {
-    title.textContent = "🔐 Hospital Admin Sign in";
     if (tabs) tabs.hidden = true;
     $("#loginForm").hidden = false;
     $("#registerForm").hidden = true;
     if (pHint) pHint.hidden = true;
     if (aHint) aHint.hidden = false;
-    $("#liEmail").placeholder = "admin@example.com";
+    $("#liEmail").placeholder = "admin@medicare.local";
+    $("#liEmail").autofocus = true;
   } else {
-    title.textContent = "Patient Sign in";
     if (tabs) tabs.hidden = false;
     setAuthTab("login");
     if (pHint) pHint.hidden = false;
     if (aHint) aHint.hidden = true;
     $("#liEmail").placeholder = "you@example.com";
   }
+  applyAuthHeaders();
 }
 
 let authResolver = null;
@@ -154,16 +168,27 @@ function showAuth(message, { force = false, mode = "patient" } = {}) {
   if (!modal.open) modal.showModal();
   return new Promise((resolve) => { authResolver = resolve; });
 }
+function closeAuthDrawer() {
+  const m = $("#authModal");
+  if (!m.open || m.classList.contains("closing")) return;
+  m.classList.add("closing");           // slide-out animation (drawerOut)
+  setTimeout(() => { m.classList.remove("closing"); m.close(); }, 280);
+}
 function finishAuth(ok) {
-  if ($("#authModal").open) $("#authModal").close();
+  closeAuthDrawer();
   const r = authResolver; authResolver = null;
   r?.(ok);
 }
 $("#authModal").addEventListener("close", () => {
+  $("#authModal").classList.remove("closing");
   const r = authResolver; authResolver = null;
   r?.(!!state.user);
 });
-$("#authClose").addEventListener("click", () => $("#authModal").close());
+// Escape → animate out instead of snapping shut
+$("#authModal").addEventListener("cancel", (e) => { e.preventDefault(); closeAuthDrawer(); });
+$("#authClose").addEventListener("click", closeAuthDrawer);
+// Click on the dimmed backdrop (dialog box itself) also closes
+$("#authModal").addEventListener("click", (e) => { if (e.target === $("#authModal")) closeAuthDrawer(); });
 $("#authBtn").addEventListener("click", () =>
   showAuth("Sign in to book appointments, pay online and manage your visits.", { mode: "patient" }));
 
@@ -171,20 +196,75 @@ $("#toAdminLogin")?.addEventListener("click", () => setAuthMode("admin"));
 $("#toPatientLogin")?.addEventListener("click", () => setAuthMode("patient"));
 
 function setAuthTab(tab) {
-  $$(".auth-tab").forEach((t) => t.classList.toggle("active", t.dataset.authtab === tab));
-  $("#loginForm").hidden = tab !== "login";
-  $("#registerForm").hidden = tab !== "register";
-  $("#authTitle").textContent = tab === "login" ? "Patient Sign in" : "Create your account";
+  authTab = tab;
+  $$("[data-authtab]").forEach((t) => t.classList.toggle("active", t.dataset.authtab === tab));
+  const tabs = $("#authTabs");
+  if (tabs) tabs.dataset.active = tab;   // slides the white pill under the active tab
+  const showForm = tab === "login" ? $("#loginForm") : $("#registerForm");
+  const hideForm = tab === "login" ? $("#registerForm") : $("#loginForm");
+  showForm.classList.add("switching");
+  hideForm.classList.add("switching");
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    showForm.hidden = false;
+    hideForm.hidden = true;
+    showForm.classList.remove("switching");
+  }));
   const m = $("#authMsg");
   if (m) m.hidden = true;
+  applyAuthHeaders();
+  const first = $(tab === "login" ? "#liEmail" : "#rgName");
+  setTimeout(() => first?.focus(), 60);
 }
-$$("[data-authtab]").forEach((t) => t.addEventListener("click", () => setAuthTab(t.dataset.authtab)));
+$$("[data-authtab]").forEach((t) => t.addEventListener("click", () => { if (authMode !== "admin") setAuthTab(t.dataset.authtab); }));
 
 function authNote(text, ok = false) {
   const m = $("#authMsg");
   m.hidden = false;
   m.textContent = text;
   m.classList.toggle("ok", ok);
+}
+
+// Show/hide password toggles
+$$("[data-eye]").forEach((btn) => btn.addEventListener("click", () => {
+  const input = document.getElementById(btn.dataset.eye);
+  if (!input) return;
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  btn.textContent = show ? "Hide" : "Show";
+  btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
+  input.focus();
+}));
+
+// Clear the error banner as soon as the user edits the form again
+["#loginForm", "#registerForm"].forEach((sel) =>
+  document.addEventListener("input", (e) => {
+    if (e.target.closest(sel)) { const m = $("#authMsg"); if (m && !m.classList.contains("ok")) m.hidden = true; }
+  }));
+
+// Focus the first field whenever the modal opens
+$("#authModal").addEventListener("toggle", () => {});
+const _authModal = $("#authModal");
+new MutationObserver(() => {
+  if (!_authModal.open) return;
+  const target = $(authMode === "admin" || authTab === "login" ? "#liEmail" : "#rgName");
+  setTimeout(() => target?.focus(), 60);
+}).observe($("#authModal"), { attributes: true, attributeFilter: ["open"] });
+
+// One-tap demo credentials: fill and submit immediately
+function submitLogin() { $("#loginForm").requestSubmit(); }
+function fillDemo(kind) {
+  setAuthTab("login");
+  const map = {
+    ayush:  ["ayushgupta7440@gmail.com", "admin123"],
+    admin:  ["admin@medicare.local", "admin123"],
+    patient:["demo@medicare.local", "demo1234"],
+  };
+  const pair = map[kind];
+  if (!pair) return;
+  $("#liEmail").value = pair[0];
+  $("#liPass").value = pair[1];
+  authNote("Signed you in with the demo account…", true);
+  submitLogin();
 }
 
 function refreshMyView() {
@@ -209,13 +289,16 @@ async function afterAuth() {
 
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const email = $("#liEmail").value.trim();
+  const password = $("#liPass").value;
+  if (!email || !password) { authNote("Enter your email and password to sign in."); return; }
   const btn = e.target.querySelector('button[type="submit"]');
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = "Signing in…";
   try {
     const res = await api("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email: $("#liEmail").value.trim(), password: $("#liPass").value }),
+      body: JSON.stringify({ email, password }),
     });
     if (res.token) localStorage.setItem("medicare_token", res.token);
     state.user = res.user;
@@ -274,22 +357,9 @@ $("#logoutBtn").addEventListener("click", async () => {
 // Demo account click-to-autofill handler
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-demo]");
-  if (!btn) return;
-  const demoType = btn.dataset.demo;
-  setAuthTab("login");
-  if (demoType === "ayush") {
-    $("#liEmail").value = "ayushgupta7440@gmail.com";
-    $("#liPass").value = "admin123";
-    authNote("Filled Admin credentials for Ayush Gupta. Click 'Sign in' to continue.", true);
-  } else if (demoType === "admin") {
-    $("#liEmail").value = "admin@medicare.local";
-    $("#liPass").value = "admin123";
-    authNote("Filled Hospital Admin credentials. Click 'Sign in' to continue.", true);
-  } else if (demoType === "patient") {
-    $("#liEmail").value = "demo@medicare.local";
-    $("#liPass").value = "demo1234";
-    authNote("Filled Demo Patient credentials. Click 'Sign in' to continue.", true);
-  }
+  if (btn) { fillDemo(btn.dataset.demo); return; }
+  const swap = e.target.closest("[data-authtab].link-btn");
+  if (swap && authMode !== "admin") { setAuthTab(swap.dataset.authtab); e.preventDefault(); }
 });
 
 function navigate(view) {
