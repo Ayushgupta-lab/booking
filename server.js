@@ -5,9 +5,18 @@
  */
 const path = require("path");
 const crypto = require("crypto");
+const dns = require("dns");
 const express = require("express");
 const mongoose = require("mongoose");
 const { DatabaseSync } = require("node:sqlite");
+
+// Configure DNS fallback for MongoDB Atlas SRV resolution reliability
+try {
+  dns.setDefaultResultOrder?.("ipv4first");
+  dns.setServers(["8.8.8.8", "1.1.1.1"]);
+} catch {
+  // DNS fallback optional
+}
 
 // Load .env if present (supported natively in Node.js 20.12+)
 try {
@@ -21,6 +30,7 @@ try {
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, "hospital.db");
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/booking";
+
 
 
 const app = express();
