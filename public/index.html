@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediCare Hospital — Book Appointments Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- ============================== NAVBAR ============================== -->
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a class="brand" href="#" data-nav="home">
+        <span class="brand-mark">✚</span>
+        <span>MediCare<span class="brand-thin">Hospital</span></span>
+      </a>
+      <nav class="nav-links" id="navLinks">
+        <button class="nav-link active" data-nav="home">Home</button>
+        <button class="nav-link" data-nav="book">Book Appointment</button>
+        <button class="nav-link" data-nav="my">My Bookings</button>
+        <button class="nav-link" data-nav="admin">Admin Panel</button>
+      </nav>
+      <div class="db-pill" id="dbStatusPill" title="Database status">● Checking DB…</div>
+      <div class="nav-auth" id="navAuth">
+        <button class="btn btn-ghost" id="authBtn">Sign in</button>
+      </div>
+      <div class="user-chip" id="userChip" hidden>
+        <span class="user-ava" id="userAva">P</span>
+        <span class="user-name" id="userName">Patient</span>
+        <span class="role-badge" id="userRoleBadge" hidden>Patient</span>
+        <button class="chip-link" id="logoutBtn" title="Sign out">Sign out</button>
+      </div>
+      <button class="nav-burger" id="navBurger" aria-label="Toggle menu">☰</button>
+      <button class="btn btn-danger nav-emg" id="emergencyBtn">🚨 Emergency</button>
+      <button class="btn btn-primary nav-cta" data-nav="book">Book Now</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- =============================== HOME =============================== -->
+    <section id="view-home" class="view active">
+      <div class="hero">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <span class="badge badge-light">● Open 24×7 · Emergency care available</span>
+            <h1>Your health, <em>booked in seconds.</em></h1>
+            <p>Consult top specialists, book real-time slots online, and shift your appointment instantly if an emergency gets in the way — no calls, no queues.</p>
+            <div class="hero-actions">
+              <button class="btn btn-primary btn-lg" data-nav="book">Book an Appointment</button>
+              <button class="btn btn-ghost btn-lg" data-nav="my">Manage My Booking</button>
+            </div>
+            <div class="hero-stats">
+              <div><strong id="statDoctors">8</strong><span>Specialists</span></div>
+              <div><strong id="statBookings">0</strong><span>Appointments</span></div>
+              <div><strong>4.8★</strong><span>Patient rating</span></div>
+              <div><strong>&lt;2 min</strong><span>To book</span></div>
+            </div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="hero-card hero-card-1">
+              <div class="hero-card-icon">🩺</div>
+              <div><strong>Dr. Aisha Sharma</strong><span>Cardiology · Today 10:00</span></div>
+              <span class="chip chip-ok">Confirmed</span>
+            </div>
+            <div class="hero-card hero-card-2">
+              <div class="hero-card-icon">⚡</div>
+              <div><strong>Emergency shift</strong><span>Slot moved in 1 tap</span></div>
+            </div>
+            <div class="hero-cross">✚</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="container section">
+        <h2 class="section-title">Everything you need, in one portal</h2>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <div class="feature-icon">📅</div>
+            <h3>Book online</h3>
+            <p>Pick a doctor, choose a live slot and confirm — availability updates in real time.</p>
+          </article>
+          <article class="feature-card feature-card-accent">
+            <div class="feature-icon">🚨</div>
+            <h3>Emergency slot shift</h3>
+            <p>Plans changed? Move your appointment to another day or slot instantly — even swap with an open booking.</p>
+          </article>
+          <article class="feature-card">
+            <div class="feature-icon">🎛️</div>
+            <h3>Full control</h3>
+            <p>View, edit, reschedule, cancel or delete your bookings anytime from any device.</p>
+          </article>
+        </div>
+
+        <h2 class="section-title" style="margin-top:3rem">Our departments</h2>
+        <div class="dept-grid" id="deptGrid"><!-- filled by JS --></div>
+      </div>
+    </section>
+
+    <!-- =============================== BOOK =============================== -->
+    <section id="view-book" class="view">
+      <div class="container section">
+        <div class="page-head">
+          <h1>Book an appointment</h1>
+          <p>Three simple steps — choose your doctor, pick a live slot, confirm.</p>
+        </div>
+
+        <!-- Step 1: doctors -->
+        <div class="step">
+          <div class="step-label"><span>1</span> Choose a doctor</div>
+          <div class="filter-row">
+            <input type="search" id="docSearch" class="input" placeholder="Search doctor or specialty…" />
+            <select id="specialtyFilter" class="input"><option value="">All specialties</option></select>
+          </div>
+          <div class="doctor-grid" id="doctorGrid"><!-- filled by JS --></div>
+        </div>
+
+        <!-- Step 2: date + slots -->
+        <div class="step" id="slotStep" hidden>
+          <div class="step-label"><span>2</span> Pick a date &amp; time slot</div>
+          <div class="slot-panel">
+            <div class="slot-panel-left">
+              <label class="field-label">Date</label>
+              <input type="date" id="apptDate" class="input" />
+              <div class="quick-dates" id="quickDates"></div>
+              <p class="hint" id="docDaysHint"></p>
+            </div>
+            <div class="slot-panel-right">
+              <label class="field-label">Available slots <span class="hint-inline">(green = free · grey = booked · ✖ = off duty)</span></label>
+              <div class="slot-grid" id="slotGrid"><p class="muted">Select a doctor and date to see slots.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: patient details -->
+        <div class="step" id="formStep" hidden>
+          <div class="step-label"><span>3</span> Your details</div>
+          <form id="bookForm" class="book-form">
+            <div class="form-grid">
+              <div class="field">
+                <label for="pName">Full name *</label>
+                <input id="pName" class="input" required placeholder="e.g. Aarav Patel" />
+              </div>
+              <div class="field">
+                <label for="pPhone">Phone *</label>
+                <input id="pPhone" class="input" required placeholder="e.g. +91 98123 45678" />
+              </div>
+              <div class="field">
+                <label for="pEmail">Email</label>
+                <input id="pEmail" type="email" class="input" placeholder="you@example.com" />
+              </div>
+              <div class="field">
+                <label for="pReason">Reason for visit</label>
+                <input id="pReason" class="input" placeholder="e.g. fever, follow-up, check-up" />
+              </div>
+            </div>
+            <div class="summary" id="bookSummary"></div>
+            <button class="btn btn-primary btn-lg" type="submit">Confirm Booking ✚</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================= EMERGENCY ============================= -->
+    <section id="view-emergency" class="view">
+      <div class="container section">
+        <div class="emg-head">
+          <span class="emg-icon">🚨</span>
+          <div>
+            <h1>Emergency Booking</h1>
+            <p>We'll find you the <strong>earliest available slot</strong> — no need to browse. Just tell us who needs care.</p>
+          </div>
+        </div>
+
+        <div class="emg-grid">
+          <form id="emgForm" class="emg-form">
+            <div class="field"><label for="emgName">Patient name *</label>
+              <input id="emgName" class="input" required placeholder="Who needs care?" /></div>
+            <div class="field"><label for="emgPhone">Phone *</label>
+              <input id="emgPhone" class="input" required placeholder="Reach you on…" /></div>
+            <div class="field"><label for="emgSpecialty">Department (optional)</label>
+              <select id="emgSpecialty" class="input"><option value="">Any / fastest available</option></select></div>
+            <div class="field"><label for="emgReason">What's happening?</label>
+              <input id="emgReason" class="input" placeholder="e.g. chest pain, high fever, injury…" /></div>
+            <button class="btn btn-danger btn-lg" type="submit">⚡ Find earliest slot now</button>
+            <p class="hint">We scan the next 7 days across all matching doctors and book the first open slot automatically.</p>
+          </form>
+
+          <div class="emg-side">
+            <div class="emg-tip"><strong>Why use this?</strong>
+              <ul>
+                <li>⚡ Auto-assigns the <em>earliest open slot</em> — no browsing needed</li>
+                <li>❤️ Flagged as <em>emergency</em> so staff prioritise it</li>
+                <li>📞 You can still call 1800-100-200 if it's life-threatening</li>
+              </ul>
+            </div>
+            <div id="emgResult" class="emg-result" hidden></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ MY BOOKINGS ============================ -->
+    <section id="view-my" class="view">
+      <div class="container section">
+        <div class="page-head">
+          <h1>My bookings</h1>
+          <p>Look up your appointments with your phone number — edit, shift in an emergency, or cancel.</p>
+        </div>
+
+        <div class="lookup-bar">
+          <input id="phoneLookup" class="input input-lg" placeholder="Enter your phone number…" />
+          <button id="lookupBtn" class="btn btn-primary">Find my bookings</button>
+          <button id="showAllBtn" class="btn btn-ghost">Show all</button>
+        </div>
+
+        <div class="alert alert-emergency" id="emergencyBanner">
+          <div>
+            <strong>🚨 Facing an emergency?</strong>
+            <span>You don't need to cancel — shift your slot to any free time, or swap with another booking, in one tap.</span>
+          </div>
+        </div>
+
+        <div id="myList" class="appt-list"><p class="muted">Search with your phone number to see your appointments.</p></div>
+      </div>
+    </section>
+
+    <!-- =============================== ADMIN =============================== -->
+    <section id="view-admin" class="view">
+      <div class="container section">
+        <div class="page-head">
+          <h1>Admin panel</h1>
+          <p>Every booking in one place — create, read, update and delete.</p>
+        </div>
+
+        <div id="adminGate" class="admin-gate" hidden>
+          <div class="admin-gate-card">
+            <div class="admin-gate-icon">🔐</div>
+            <h2>Admin sign-in required</h2>
+            <p id="adminGateMsg">The admin panel lists every booking and manages the doctor team — it needs an admin account.</p>
+            <button class="btn btn-primary" id="adminSignin">Sign in as admin</button>
+            <p class="hint">Demo admin · admin@medicare.local / admin123</p>
+          </div>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-card"><span class="stat-num" id="aTotal">0</span><span class="stat-cap">Total bookings</span></div>
+          <div class="stat-card stat-ok"><span class="stat-num" id="aConfirmed">0</span><span class="stat-cap">Confirmed</span></div>
+          <div class="stat-card stat-done"><span class="stat-num" id="aCompleted">0</span><span class="stat-cap">Completed</span></div>
+          <div class="stat-card stat-warn"><span class="stat-num" id="aEmergency">0</span><span class="stat-cap">Emergency shifts</span></div>
+          <div class="stat-card stat-off"><span class="stat-num" id="aCancelled">0</span><span class="stat-cap">Cancelled</span></div>
+        </div>
+
+        <div class="admin-toolbar">
+          <input id="adminSearch" class="input" placeholder="Search name, phone, reason…" />
+          <select id="adminStatus" class="input">
+            <option value="all">All statuses</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <select id="adminDoctor" class="input"><option value="">All doctors</option></select>
+          <button id="adminRefresh" class="btn btn-ghost">↻ Refresh</button>
+          <button id="adminNew" class="btn btn-primary">+ New booking</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="appt-table">
+            <thead>
+              <tr>
+                <th>ID</th><th>Patient</th><th>Doctor</th><th>Date &amp; time</th>
+                <th>Reason</th><th>Status</th><th class="th-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="adminRows"><tr><td colspan="7" class="muted center">Loading…</td></tr></tbody>
+          </table>
+        </div>
+
+        <!-- ---------------- Manage doctors ---------------- -->
+        <div class="doc-mgmt-head">
+          <h2>Manage doctors</h2>
+          <button id="addDoctorBtn" class="btn btn-primary">+ Add new doctor</button>
+        </div>
+        <div class="doc-mgmt-grid" id="docMgmtGrid"><p class="muted">Loading…</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>
+        <div class="brand"><span class="brand-mark">✚</span> MediCare<span class="brand-thin">Hospital</span></div>
+        <p>12 Wellness Avenue · Helpline 1800-100-200</p>
+      </div>
+      <p>© 2026 MediCare Hospital. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- ============================== MODALS ============================== -->
+  <dialog id="editModal" class="modal">
+    <form method="dialog" class="modal-card" id="editForm">
+      <div class="modal-head">
+        <h3>Edit appointment <span id="editApptId" class="modal-id"></span></h3>
+        <button class="icon-btn" value="cancel" aria-label="Close">✕</button>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Patient name *</label><input id="eName" class="input" required /></div>
+        <div class="field"><label>Phone *</label><input id="ePhone" class="input" required /></div>
+        <div class="field"><label>Email</label><input id="eEmail" type="email" class="input" /></div>
+        <div class="field"><label>Reason</label><input id="eReason" class="input" /></div>
+        <div class="field"><label>Date</label><input id="eDate" type="date" class="input" /></div>
+        <div class="field"><label>Time slot</label><select id="eSlot" class="input"></select></div>
+        <div class="field"><label>Status</label>
+          <select id="eStatus" class="input">
+            <option value="confirmed">Confirmed</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" value="cancel">Cancel</button>
+        <button class="btn btn-primary" id="editSave" value="default">Save changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="shiftModal" class="modal">
+    <form method="dialog" class="modal-card" id="shiftForm">
+      <div class="modal-head">
+        <h3>🚨 Emergency slot shift</h3>
+        <button class="icon-btn" value="cancel" aria-label="Close">✕</button>
+      </div>
+      <p class="shift-for" id="shiftFor"></p>
+      <div class="form-grid">
+        <div class="field"><label>New date</label><input id="sDate" type="date" class="input" required /></div>
+        <div class="field"><label>New time slot</label><select id="sSlot" class="input"></select></div>
+      </div>
+      <label class="check-row">
+        <input type="checkbox" id="sSwap" />
+        <span>If the slot is taken, <strong>swap</strong> with the patient holding it (they get your old slot)</span>
+      </label>
+      <p class="hint" id="shiftHint"></p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" value="cancel">Keep my slot</button>
+        <button class="btn btn-danger" id="shiftSave" value="default">Shift appointment ⚡</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="doctorModal" class="modal">
+    <form method="dialog" class="modal-card" id="doctorForm">
+      <div class="modal-head">
+        <h3 id="doctorModalTitle">Add new doctor</h3>
+        <button class="icon-btn" value="cancel" aria-label="Close">✕</button>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label>Full name *</label><input id="dName" class="input" required placeholder="Dr. …" /></div>
+        <div class="field"><label>Specialty *</label><input id="dSpecialty" class="input" required placeholder="e.g. Cardiology" /></div>
+        <div class="field"><label>Department</label><input id="dDepartment" class="input" placeholder="e.g. Heart & Vascular" /></div>
+        <div class="field"><label>Fee (₹) *</label><input id="dFee" type="number" min="0" class="input" required placeholder="e.g. 600" /></div>
+        <div class="field"><label>Rating</label><input id="dRating" type="number" min="1" max="5" step="0.1" class="input" placeholder="4.5" /></div>
+        <div class="field"><label>Experience (years)</label><input id="dExperience" type="number" min="0" class="input" placeholder="5" /></div>
+        <div class="field" style="grid-column:1/-1"><label>Bio</label><input id="dBio" class="input" placeholder="Short intro shown to patients" /></div>
+        <div class="field" style="grid-column:1/-1">
+          <label>Working days *</label>
+          <div class="days-row" id="dDays"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" value="cancel">Cancel</button>
+        <button class="btn btn-primary" id="doctorSave" value="default">Save doctor</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- ========================= ALEX AI ASSISTANT ========================= -->
+  <button id="alexToggle" class="alex-fab" aria-label="Open Alex assistant" title="Alex — your booking assistant">🤖</button>
+  <aside id="alexPanel" class="alex-panel" hidden>
+    <header class="alex-head">
+      <div class="alex-avatar">🤖</div>
+      <div><strong>Alex</strong><span class="alex-status">● Online · AI booking assistant</span></div>
+      <button id="alexVoice" class="icon-btn" title="Toggle voice replies">🔊</button>
+      <button id="alexClose" class="icon-btn" title="Close">✕</button>
+    </header>
+    <div id="alexChat" class="alex-chat"></div>
+    <div class="alex-chips" id="alexChips"></div>
+    <form id="alexForm" class="alex-input">
+      <input id="alexText" placeholder="Ask Alex… e.g. book me a cardiologist tomorrow" autocomplete="off" />
+      <button type="button" id="alexMic" class="icon-btn" title="Speak to Alex">🎤</button>
+      <button type="submit" class="btn btn-primary">Send</button>
+    </form>
+  </aside>
+
+  <!-- ============================== AUTH MODAL ============================== -->
+  <dialog id="authModal" class="modal modal-sm">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="authTitle">Sign in to MediCare</h3>
+        <button class="icon-btn" id="authClose" aria-label="Close" type="button">✕</button>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-authtab="login" type="button">Sign in</button>
+        <button class="auth-tab" data-authtab="register" type="button">Create account</button>
+      </div>
+      <p class="auth-msg" id="authMsg" hidden></p>
+
+      <form id="loginForm" class="auth-form">
+        <div class="field"><label for="liEmail">Email</label>
+          <input id="liEmail" type="email" class="input" required placeholder="you@example.com" autocomplete="email" /></div>
+        <div class="field"><label for="liPass">Password</label>
+          <input id="liPass" type="password" class="input" required placeholder="••••••••" autocomplete="current-password" /></div>
+        <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
+      </form>
+
+      <form id="registerForm" class="auth-form" hidden>
+        <div class="field"><label for="rgName">Full name</label>
+          <input id="rgName" class="input" required placeholder="e.g. Aarav Patel" autocomplete="name" /></div>
+        <div class="field"><label for="rgEmail">Email</label>
+          <input id="rgEmail" type="email" class="input" required placeholder="you@example.com" autocomplete="email" /></div>
+        <div class="field"><label for="rgPhone">Phone (optional)</label>
+          <input id="rgPhone" class="input" placeholder="+91 98123 45678" autocomplete="tel" /></div>
+        <div class="field"><label for="rgPass">Password</label>
+          <input id="rgPass" type="password" class="input" required minlength="6" placeholder="At least 6 characters" autocomplete="new-password" /></div>
+        <button class="btn btn-primary btn-lg" type="submit">Create account</button>
+      </form>
+
+      <div class="auth-hint">
+        <strong>⚡ 1-Click Demo Logins:</strong>
+        <button type="button" class="btn-demo demo-highlight" data-demo="ayush">⭐ Ayush Gupta (Admin) · ayushgupta7440@gmail.com</button>
+        <button type="button" class="btn-demo" data-demo="admin">Hospital Admin · admin@medicare.local</button>
+        <button type="button" class="btn-demo" data-demo="patient">Demo Patient · demo@medicare.local</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============================= PAYMENT MODAL ============================ -->
+  <dialog id="payModal" class="modal modal-sm">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>💳 Secure checkout</h3>
+        <button class="icon-btn" id="payClose" aria-label="Close" type="button">✕</button>
+      </div>
+
+      <div id="payFormArea">
+        <div class="pay-summary" id="paySummary"></div>
+        <form id="payForm" class="auth-form">
+          <div class="field"><label for="pyNumber">Card number</label>
+            <input id="pyNumber" class="input card-input" inputmode="numeric" maxlength="19" placeholder="4242 4242 4242 4242" autocomplete="cc-number" /></div>
+          <div class="field"><label for="pyName">Name on card</label>
+            <input id="pyName" class="input" placeholder="As printed on the card" autocomplete="cc-name" /></div>
+          <div class="pay-row">
+            <div class="field"><label for="pyExpiry">Expiry</label>
+              <input id="pyExpiry" class="input" inputmode="numeric" maxlength="5" placeholder="MM/YY" autocomplete="cc-exp" /></div>
+            <div class="field"><label for="pyCvv">CVV</label>
+              <input id="pyCvv" class="input" inputmode="numeric" maxlength="4" placeholder="123" autocomplete="cc-csc" /></div>
+          </div>
+          <p class="auth-msg" id="payMsg" hidden></p>
+          <button class="btn btn-primary btn-lg" id="payBtn" type="submit">Pay ₹0</button>
+        </form>
+        <button class="btn btn-ghost pay-later" id="payLater" type="button">Pay later at the hospital</button>
+        <p class="hint pay-hint">Sandbox mode — try <b>4242 4242 4242 4242</b> (approves) or <b>4000 0000 0000 0002</b> (declines). No real money moves.</p>
+      </div>
+
+      <div id="payReceipt" class="pay-receipt" hidden></div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

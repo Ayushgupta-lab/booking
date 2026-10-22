@@ -1,0 +1,7 @@
+node_modules/
+*.log
+.freebuff/
+hospital.db-shm
+hospital.db-wal
+.DS_Store
+Thumbs.db
