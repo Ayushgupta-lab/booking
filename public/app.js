@@ -92,30 +92,61 @@ function renderUser() {
   const u = state.user;
   $("#navAuth").hidden = !!u;
   $("#userChip").hidden = !u;
+
+  const isAdmin = u && u.role === "admin";
+  const navAdmin = $("#navAdminLink");
+  if (navAdmin) navAdmin.hidden = !isAdmin;
+
+  const roleEl = $("#userRoleBadge");
+  if (roleEl) {
+    if (isAdmin) {
+      roleEl.textContent = "Admin";
+      roleEl.className = "role-badge admin";
+      roleEl.hidden = false;
+    } else {
+      roleEl.hidden = true; // DO NOT show role badge for patient
+    }
+  }
+
   if (!u) return;
   $("#userName").textContent = u.name;
   $("#userAva").textContent = (u.name.replace(/^Dr\.?\s*/i, "").match(/\b\w/g) || ["P"]).slice(0, 2).join("").toUpperCase();
+}
 
-  let roleEl = $("#userRoleBadge");
-  if (!roleEl) {
-    roleEl = document.createElement("span");
-    roleEl.id = "userRoleBadge";
-    $("#userName").insertAdjacentElement("afterend", roleEl);
-  }
-  if (u.role === "admin") {
-    roleEl.textContent = "Admin";
-    roleEl.className = "role-badge admin";
-    roleEl.hidden = false;
+let authMode = "patient"; // "patient" | "admin"
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const isAdm = mode === "admin";
+  const tabs = $("#authTabs");
+  const pHint = $("#patientAuthHint");
+  const aHint = $("#adminAuthHint");
+  const title = $("#authTitle");
+  const m = $("#authMsg");
+  if (m) m.hidden = true;
+
+  if (isAdm) {
+    title.textContent = "🔐 Hospital Admin Sign in";
+    if (tabs) tabs.hidden = true;
+    $("#loginForm").hidden = false;
+    $("#registerForm").hidden = true;
+    if (pHint) pHint.hidden = true;
+    if (aHint) aHint.hidden = false;
+    $("#liEmail").placeholder = "admin@example.com";
   } else {
-    roleEl.textContent = "Patient";
-    roleEl.className = "role-badge patient";
-    roleEl.hidden = false;
+    title.textContent = "Patient Sign in";
+    if (tabs) tabs.hidden = false;
+    setAuthTab("login");
+    if (pHint) pHint.hidden = false;
+    if (aHint) aHint.hidden = true;
+    $("#liEmail").placeholder = "you@example.com";
   }
 }
 
 let authResolver = null;
-function showAuth(message, { force = false } = {}) {
+function showAuth(message, { force = false, mode = "patient" } = {}) {
   if (state.user && !force) return Promise.resolve(true);
+  setAuthMode(mode);
   const msg = $("#authMsg");
   msg.hidden = !message;
   if (message) { msg.textContent = message; msg.classList.remove("ok"); }
@@ -134,13 +165,16 @@ $("#authModal").addEventListener("close", () => {
 });
 $("#authClose").addEventListener("click", () => $("#authModal").close());
 $("#authBtn").addEventListener("click", () =>
-  showAuth("Sign in to book appointments, pay online and manage your visits."));
+  showAuth("Sign in to book appointments, pay online and manage your visits.", { mode: "patient" }));
+
+$("#toAdminLogin")?.addEventListener("click", () => setAuthMode("admin"));
+$("#toPatientLogin")?.addEventListener("click", () => setAuthMode("patient"));
 
 function setAuthTab(tab) {
   $$(".auth-tab").forEach((t) => t.classList.toggle("active", t.dataset.authtab === tab));
   $("#loginForm").hidden = tab !== "login";
   $("#registerForm").hidden = tab !== "register";
-  $("#authTitle").textContent = tab === "login" ? "Sign in to MediCare" : "Create your account";
+  $("#authTitle").textContent = tab === "login" ? "Patient Sign in" : "Create your account";
   const m = $("#authMsg");
   if (m) m.hidden = true;
 }
@@ -818,7 +852,7 @@ function hideAdminGate() {
 $("#adminSignin").addEventListener("click", async () => {
   const note = state.user ? `You're signed in as ${state.user.name}. Use the admin account below to open the panel.`
     : "Enter the admin account to open the panel.";
-  const ok = await showAuth(note, { force: true });
+  const ok = await showAuth(note, { force: true, mode: "admin" });
   if (ok && state.user?.role !== "admin")
     showAdminGate("That account isn't an admin — sign in with Ayush Gupta (ayushgupta7440@gmail.com / admin123) or admin@medicare.local.");
   else loadAdmin();

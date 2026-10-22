@@ -314,6 +314,9 @@ body { font-family: var(--font); background: var(--bg); color: var(--ink); line-
 .btn-demo:hover { background: #eff6ff; border-color: #93c5fd; transform: translateY(-1px); }
 .btn-demo.demo-highlight { background: #fefce8; border-color: #fde047; font-weight: 700; color: #854d0e; }
 .btn-demo.demo-highlight:hover { background: #fef08a; border-color: #eab308; }
+.auth-switch-row { display: flex; align-items: center; justify-content: space-between; margin-top: 0.35rem; padding-top: 0.35rem; border-top: 1px dotted var(--line); font-size: 0.78rem; color: var(--muted); }
+.btn-switch-portal { background: none; border: none; font: inherit; font-size: 0.78rem; font-weight: 700; color: var(--teal-700); cursor: pointer; padding: 0.2rem 0.4rem; border-radius: 4px; }
+.btn-switch-portal:hover { text-decoration: underline; color: var(--teal-900); }
 
 .role-badge { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.15rem 0.5rem; border-radius: 999px; }
 .role-badge.admin { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }

@@ -21,7 +21,7 @@
         <button class="nav-link active" data-nav="home">Home</button>
         <button class="nav-link" data-nav="book">Book Appointment</button>
         <button class="nav-link" data-nav="my">My Bookings</button>
-        <button class="nav-link" data-nav="admin">Admin Panel</button>
+        <button class="nav-link" id="navAdminLink" data-nav="admin" hidden>Admin Panel</button>
       </nav>
       <div class="db-pill" id="dbStatusPill" title="Database status">● Checking DB…</div>
       <div class="nav-auth" id="navAuth">
@@ -398,12 +398,12 @@
   <dialog id="authModal" class="modal modal-sm">
     <div class="modal-card">
       <div class="modal-head">
-        <h3 id="authTitle">Sign in to MediCare</h3>
+        <h3 id="authTitle">Patient Sign in</h3>
         <button class="icon-btn" id="authClose" aria-label="Close" type="button">✕</button>
       </div>
-      <div class="auth-tabs">
-        <button class="auth-tab active" data-authtab="login" type="button">Sign in</button>
-        <button class="auth-tab" data-authtab="register" type="button">Create account</button>
+      <div class="auth-tabs" id="authTabs">
+        <button class="auth-tab active" data-authtab="login" type="button" id="tabLoginBtn">Patient Sign in</button>
+        <button class="auth-tab" data-authtab="register" type="button" id="tabRegisterBtn">Create account</button>
       </div>
       <p class="auth-msg" id="authMsg" hidden></p>
 
@@ -412,7 +412,7 @@
           <input id="liEmail" type="email" class="input" required placeholder="you@example.com" autocomplete="email" /></div>
         <div class="field"><label for="liPass">Password</label>
           <input id="liPass" type="password" class="input" required placeholder="••••••••" autocomplete="current-password" /></div>
-        <button class="btn btn-primary btn-lg" type="submit">Sign in</button>
+        <button class="btn btn-primary btn-lg" type="submit" id="authSubmitBtn">Sign in</button>
       </form>
 
       <form id="registerForm" class="auth-form" hidden>
@@ -427,11 +427,24 @@
         <button class="btn btn-primary btn-lg" type="submit">Create account</button>
       </form>
 
-      <div class="auth-hint">
-        <strong>⚡ 1-Click Demo Logins:</strong>
+      <!-- PATIENT LOGIN HINT (Default: ONLY shows patient) -->
+      <div class="auth-hint" id="patientAuthHint">
+        <strong>Demo Patient Login:</strong>
+        <button type="button" class="btn-demo" data-demo="patient">👤 Demo Patient · demo@medicare.local / demo1234</button>
+        <div class="auth-switch-row">
+          <span>Hospital Staff or Doctor?</span>
+          <button type="button" class="btn-switch-portal" id="toAdminLogin">Admin Login →</button>
+        </div>
+      </div>
+
+      <!-- ADMIN LOGIN HINT (ONLY shown in admin login mode) -->
+      <div class="auth-hint" id="adminAuthHint" hidden>
+        <strong style="color: #b45309;">🔐 Administrator Login:</strong>
         <button type="button" class="btn-demo demo-highlight" data-demo="ayush">⭐ Ayush Gupta (Admin) · ayushgupta7440@gmail.com</button>
         <button type="button" class="btn-demo" data-demo="admin">Hospital Admin · admin@medicare.local</button>
-        <button type="button" class="btn-demo" data-demo="patient">Demo Patient · demo@medicare.local</button>
+        <div class="auth-switch-row">
+          <button type="button" class="btn-switch-portal" id="toPatientLogin">← Back to Patient Sign in</button>
+        </div>
       </div>
     </div>
   </dialog>
