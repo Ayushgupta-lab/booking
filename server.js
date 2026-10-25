@@ -3,6 +3,7 @@
  * Express + SQLite (node:sqlite) + MongoDB (Mongoose)
  * Full CRUD: Create, Read, Update (incl. emergency slot shift), Delete
  */
+const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const dns = require("dns");
@@ -28,7 +29,22 @@ try {
 }
 
 const PORT = process.env.PORT || 3000;
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "hospital.db");
+let DB_PATH = process.env.DB_PATH;
+if (!DB_PATH) {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    DB_PATH = path.join("/tmp", "hospital.db");
+    const srcDb = path.join(__dirname, "hospital.db");
+    if (!fs.existsSync(DB_PATH) && fs.existsSync(srcDb)) {
+      try {
+        fs.copyFileSync(srcDb, DB_PATH);
+      } catch (e) {
+        console.warn("[Vercel] Could not copy hospital.db template to /tmp:", e.message);
+      }
+    }
+  } else {
+    DB_PATH = path.join(__dirname, "hospital.db");
+  }
+}
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/paitent_booking";
 
 
@@ -1112,6 +1128,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error." });
 });
 
-app.listen(PORT, () => {
-  console.log(`MediCare Hospital portal running at http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  app.listen(PORT, () => {
+    console.log(`MediCare Hospital portal running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
