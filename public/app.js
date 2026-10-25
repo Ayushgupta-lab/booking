@@ -1992,7 +1992,8 @@ function scanReveals() {
 
 function initTilt() {
   if (reduceMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-  $$(".feature-card, .dept-card, .testi-card, .home-doc-card").forEach((card) => {
+  const selector = ".feature-card, .dept-card, .testi-card, .home-doc-card, .bento-card, .doctor-card, .sandbox-card, .stat-box";
+  $$(selector).forEach((card) => {
     if (card.dataset.tiltReady) return;
     card.dataset.tiltReady = "1";
     card.classList.add("tilt");
@@ -2002,9 +2003,18 @@ function initTilt() {
       const py = (e.clientY - r.top) / r.height;
       card.style.setProperty("--mx", `${(px * 100).toFixed(1)}%`);
       card.style.setProperty("--my", `${(py * 100).toFixed(1)}%`);
-      card.style.transform = `perspective(760px) rotateX(${((0.5 - py) * 5).toFixed(2)}deg) rotateY(${((px - 0.5) * 5).toFixed(2)}deg) translateY(-3px)`;
+
+      // Amplified 3D perspective pitch and yaw with dynamic Z-elevation
+      const maxTilt = card.classList.contains("bento-card") ? 11 : 14;
+      const rx = ((0.5 - py) * maxTilt).toFixed(2);
+      const ry = ((px - 0.5) * maxTilt).toFixed(2);
+      card.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) translate3d(0, -6px, 24px)`;
     });
-    card.addEventListener("pointerleave", () => { card.style.transform = ""; });
+    card.addEventListener("pointerleave", () => {
+      card.style.transform = "";
+      card.style.removeProperty("--mx");
+      card.style.removeProperty("--my");
+    });
   });
 }
 
@@ -2031,21 +2041,47 @@ function animateCount(el, to) {
 function initHeroParallax() {
   const hero = document.querySelector(".hero");
   const art = document.querySelector(".hero-art");
+  const deck = document.querySelector("#heroDeckMockup");
   if (!hero || !art || reduceMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-  const floaters = $$(".parallax-card, .parallax-elem", hero).map((el) => ({ el, speed: Number(el.dataset.speed || 0) }));
+  const floaters = $$(".parallax-card, .parallax-elem", hero).map((el) => ({
+    el,
+    speed: Number(el.dataset.speed || 0.1),
+    isCard1: el.classList.contains("hero-card-1"),
+    isCard2: el.classList.contains("hero-card-2")
+  }));
+
   hero.addEventListener("pointermove", (e) => {
     const r = hero.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width - 0.5;
     const y = (e.clientY - r.top) / r.height - 0.5;
-    art.style.transform = `perspective(1000px) rotateY(${(x * 7).toFixed(2)}deg) rotateX(${(-y * 6).toFixed(2)}deg)`;
-    // individual translate keeps the CSS float animations intact
-    floaters.forEach(({ el, speed }) => {
-      el.style.translate = `${(x * speed * 260).toFixed(1)}px ${(y * speed * 160).toFixed(1)}px`;
+
+    // 3D camera pan & multi-axis pitch on hero art stage
+    art.style.transform = `perspective(1400px) rotateY(${(x * 16).toFixed(2)}deg) rotateX(${(-y * 14).toFixed(2)}deg)`;
+
+    // Independent 3D roll and depth pop on terminal deck mockup
+    if (deck) {
+      const deckRotY = (-7 + x * 18).toFixed(2);
+      const deckRotX = (5 - y * 16).toFixed(2);
+      const deckZ = (24 + Math.abs(x) * 20).toFixed(1);
+      deck.style.transform = `perspective(1200px) rotateY(${deckRotY}deg) rotateX(${deckRotX}deg) translateZ(${deckZ}px)`;
+    }
+
+    // 3D diverging flight on satellite cards and elements
+    floaters.forEach(({ el, speed, isCard1, isCard2 }) => {
+      const dx = (x * speed * 320).toFixed(1);
+      const dy = (y * speed * 220).toFixed(1);
+      const zBase = isCard1 ? 55 : (isCard2 ? 65 : -30);
+      const dz = (zBase + (speed > 0 ? 1 : -1) * (x * 40)).toFixed(1);
+      const rotY = (x * 22).toFixed(1);
+      const rotX = (-y * 18).toFixed(1);
+      el.style.transform = `translate3d(${dx}px, ${dy}px, ${dz}px) rotateY(${rotY}deg) rotateX(${rotX}deg)`;
     });
-  });
+  }, { passive: true });
+
   hero.addEventListener("pointerleave", () => {
     art.style.transform = "";
-    floaters.forEach(({ el }) => { el.style.translate = ""; });
+    if (deck) deck.style.transform = "";
+    floaters.forEach(({ el }) => { el.style.transform = ""; });
   });
 }
 
@@ -2183,20 +2219,31 @@ function initScrollProgress() {
       nav.classList.toggle("is-scrolled", scrollY > 20);
     }
 
-    // High-level 3D perspective pitch on hero deck terminal mockup on scroll
-    if (heroDeck && !reduceMotion && scrollY < 900) {
-      const pitch = Math.min(14, (scrollY * 0.022)).toFixed(2);
-      const moveY = (scrollY * 0.1).toFixed(1);
-      const scale = Math.max(0.94, 1 - scrollY * 0.00014).toFixed(3);
-      heroDeck.style.transform = `perspective(1100px) rotateX(${pitch}deg) translateY(${moveY}px) scale(${scale})`;
+    // High-level 3D perspective pitch and multi-axis roll on hero deck terminal on scroll
+    if (heroDeck && !reduceMotion && scrollY < 1000) {
+      const pitch = Math.min(24, scrollY * 0.038).toFixed(2);
+      const yaw = (-7 + Math.sin(scrollY * 0.003) * 4).toFixed(2);
+      const roll = (Math.cos(scrollY * 0.004) * 2).toFixed(2);
+      const moveY = (scrollY * 0.12).toFixed(1);
+      const depthZ = (-scrollY * 0.18).toFixed(1);
+      const scale = Math.max(0.88, 1 - scrollY * 0.00018).toFixed(3);
+      heroDeck.style.transform = `perspective(1200px) rotateX(${pitch}deg) rotateY(${yaw}deg) rotateZ(${roll}deg) translate3d(0, ${moveY}px, ${depthZ}px) scale(${scale})`;
     }
 
-    // Subtle scroll parallax on hero floating elements
-    if (!reduceMotion && scrollY < 900) {
-      $$(".parallax-card, .parallax-elem").forEach((el) => {
-        const speed = Number(el.dataset.speed || 0.1);
-        el.style.transform = `translateY(${(scrollY * speed * 0.8).toFixed(1)}px)`;
-      });
+    // 3D Diverging multi-axis flight on satellite cards and ambient orbs on scroll
+    if (!reduceMotion && scrollY < 1000) {
+      const c1 = $(".hero-card-1");
+      const c2 = $(".hero-card-2");
+      if (c1) {
+        c1.style.transform = `translate3d(${(-scrollY * 0.12).toFixed(1)}px, ${(scrollY * 0.18).toFixed(1)}px, 55px) rotateY(${(-8 - scrollY * 0.02).toFixed(2)}deg) rotateX(${(4 + scrollY * 0.015).toFixed(2)}deg)`;
+      }
+      if (c2) {
+        c2.style.transform = `translate3d(${(scrollY * 0.14).toFixed(1)}px, ${(scrollY * 0.25).toFixed(1)}px, 65px) rotateY(${(8 + scrollY * 0.025).toFixed(2)}deg) rotateX(${(-5 - scrollY * 0.02).toFixed(2)}deg)`;
+      }
+      const orb1 = $(".orb-1");
+      const orb2 = $(".orb-2");
+      if (orb1) orb1.style.transform = `translate3d(0, ${(-scrollY * 0.14).toFixed(1)}px, 0)`;
+      if (orb2) orb2.style.transform = `translate3d(0, ${(scrollY * 0.12).toFixed(1)}px, 0)`;
     }
   };
 
@@ -2223,15 +2270,23 @@ function initWordScrub() {
   const update = () => {
     const r = section.getBoundingClientRect();
     const vh = window.innerHeight;
-    // Section starts lighting up when top reaches 88% of screen height
-    // Fully illuminated when center reaches 42% of screen height
-    const startY = vh * 0.88;
-    const endY = vh * 0.42;
+    const startY = vh * 0.90;
+    const endY = vh * 0.38;
     const progress = Math.min(1, Math.max(0, (startY - r.top) / (startY - endY)));
 
-    const litCount = Math.floor(progress * words.length);
+    const rawLit = progress * words.length;
+    const litCount = Math.floor(rawLit);
     words.forEach((w, idx) => {
-      w.classList.toggle("lit", idx <= litCount);
+      const isLit = idx <= litCount;
+      w.classList.toggle("lit", isLit);
+      if (idx === litCount && !reduceMotion) {
+        const frac = rawLit - litCount;
+        const rx = ((1 - frac) * 24).toFixed(1);
+        const tz = (frac * 14).toFixed(1);
+        w.style.transform = `perspective(900px) translate3d(0, 0, ${tz}px) rotateX(${rx}deg)`;
+      } else {
+        w.style.transform = "";
+      }
     });
   };
 
@@ -2250,16 +2305,16 @@ function initStackingCards() {
       const nextCard = cards[idx + 1];
       if (!nextCard) return;
       const nr = nextCard.getBoundingClientRect();
-      const stickyAnchor = 82 + (idx + 1) * 22;
-      const overlap = stickyAnchor + 48 - nr.top;
+      const stickyAnchor = 82 + (idx + 1) * 24;
+      const overlap = stickyAnchor + 54 - nr.top;
 
       if (overlap > 0) {
         const thirdCard = cards[idx + 2];
         let isDeep = false;
         if (thirdCard) {
           const tr = thirdCard.getBoundingClientRect();
-          const thirdAnchor = 82 + (idx + 2) * 22;
-          if (thirdAnchor + 48 - tr.top > 0) isDeep = true;
+          const thirdAnchor = 82 + (idx + 2) * 24;
+          if (thirdAnchor + 54 - tr.top > 0) isDeep = true;
         }
         card.classList.toggle("is-deep-dimmed", isDeep);
         card.classList.toggle("is-dimmed", !isDeep);
