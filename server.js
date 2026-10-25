@@ -29,7 +29,7 @@ try {
 
 const PORT = process.env.PORT || 3000;
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, "hospital.db");
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/booking";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/paitent_booking";
 
 
 
@@ -108,8 +108,49 @@ const sessionSchema = new mongoose.Schema({
 const MongoUser = mongoose.model("User", userSchema);
 const MongoDoctor = mongoose.model("Doctor", doctorSchema);
 const MongoAppointment = mongoose.model("Appointment", appointmentSchema);
+const MongoBooking = mongoose.model("Booking", appointmentSchema, "booking");
 const MongoPayment = mongoose.model("Payment", paymentSchema);
 const MongoSession = mongoose.model("Session", sessionSchema);
+
+async function syncAppointmentToMongo(appt) {
+  if (!mongoConnected || !appt) return;
+  try {
+    const payload = {
+      id: appt.id,
+      patient_name: appt.patient_name,
+      phone: appt.phone,
+      email: appt.email,
+      doctor_id: appt.doctor_id,
+      doctor_name: appt.doctor_name,
+      appt_date: appt.appt_date,
+      slot_time: appt.slot_time,
+      reason: appt.reason,
+      status: appt.status,
+      emergency: appt.emergency ? 1 : 0,
+      payment_status: appt.payment_status || "unpaid",
+      user_id: appt.user_id,
+      notes: appt.notes
+    };
+    await Promise.all([
+      MongoAppointment.findOneAndUpdate({ id: appt.id }, payload, { upsert: true }),
+      MongoBooking.findOneAndUpdate({ id: appt.id }, payload, { upsert: true })
+    ]);
+  } catch (err) {
+    console.warn("[MongoDB] syncAppointmentToMongo error:", err.message);
+  }
+}
+
+async function deleteAppointmentFromMongo(id) {
+  if (!mongoConnected || !id) return;
+  try {
+    await Promise.all([
+      MongoAppointment.deleteOne({ id }),
+      MongoBooking.deleteOne({ id })
+    ]);
+  } catch (err) {
+    console.warn("[MongoDB] deleteAppointmentFromMongo error:", err.message);
+  }
+}
 
 async function syncAllToMongo() {
   if (!mongoConnected) return;
@@ -134,18 +175,9 @@ async function syncAllToMongo() {
     }
     const appts = db.prepare(`SELECT a.*, d.name as doctor_name FROM appointments a JOIN doctors d ON d.id = a.doctor_id`).all();
     for (const a of appts) {
-      await MongoAppointment.findOneAndUpdate(
-        { id: a.id },
-        {
-          id: a.id, patient_name: a.patient_name, phone: a.phone, email: a.email,
-          doctor_id: a.doctor_id, doctor_name: a.doctor_name, appt_date: a.appt_date,
-          slot_time: a.slot_time, reason: a.reason, status: a.status, emergency: a.emergency,
-          payment_status: a.payment_status, user_id: a.user_id, notes: a.notes
-        },
-        { upsert: true }
-      );
+      await syncAppointmentToMongo(a);
     }
-    console.log("[MongoDB] Synchronized SQLite records to MongoDB collections successfully.");
+    console.log("[MongoDB] Synchronized SQLite records to paitent_booking collections successfully.");
   } catch (err) {
     console.warn("[MongoDB] Sync error:", err.message);
   }
@@ -878,9 +910,7 @@ app.post("/api/appointments/emergency", (req, res) => {
        JOIN doctors d ON d.id = a.doctor_id WHERE a.id = ?`
     )
     .get(info.lastInsertRowid);
-  if (mongoConnected) {
-    MongoAppointment.findOneAndUpdate({ id: created.id }, created, { upsert: true }).catch(() => {});
-  }
+  syncAppointmentToMongo(created);
   res.status(201).json(created);
 });
 
@@ -974,9 +1004,7 @@ app.post("/api/appointments", (req, res) => {
        JOIN doctors d ON d.id = a.doctor_id WHERE a.id = ?`
     )
     .get(info.lastInsertRowid);
-  if (mongoConnected) {
-    MongoAppointment.findOneAndUpdate({ id: created.id }, created, { upsert: true }).catch(() => {});
-  }
+  syncAppointmentToMongo(created);
   res.status(201).json(created);
 });
 
@@ -999,7 +1027,8 @@ app.put("/api/appointments/:id", (req, res) => {
     merged.reason || null, merged.status,
     merged.emergency ? 1 : 0, merged.swapped_from || null, merged.notes || null, existing.id
   );
-  const updated = db.prepare("SELECT * FROM appointments WHERE id = ?").get(existing.id);
+  const updated = db.prepare("SELECT a.*, d.name AS doctor_name, d.specialty, d.fee FROM appointments a JOIN doctors d ON d.id = a.doctor_id WHERE a.id = ?").get(existing.id);
+  syncAppointmentToMongo(updated);
   res.json({ ...updated, slot_moved: slotChanged });
 });
 
@@ -1044,7 +1073,12 @@ app.post("/api/appointments/:id/emergency-shift", (req, res) => {
     existing.id
   );
 
-  const updated = db.prepare("SELECT * FROM appointments WHERE id = ?").get(existing.id);
+  const updated = db.prepare("SELECT a.*, d.name AS doctor_name, d.specialty, d.fee FROM appointments a JOIN doctors d ON d.id = a.doctor_id WHERE a.id = ?").get(existing.id);
+  syncAppointmentToMongo(updated);
+  if (swappedWith) {
+    const swUpdated = db.prepare("SELECT a.*, d.name AS doctor_name, d.specialty, d.fee FROM appointments a JOIN doctors d ON d.id = a.doctor_id WHERE a.id = ?").get(swappedWith.id);
+    syncAppointmentToMongo(swUpdated);
+  }
   res.json({ appointment: updated, swapped_with: swappedWith || null });
 });
 
@@ -1055,13 +1089,16 @@ app.patch("/api/appointments/:id/status", (req, res) => {
     return res.status(400).json({ error: "Status must be confirmed, cancelled or completed." });
   const info = db.prepare("UPDATE appointments SET status=? WHERE id=?").run(status, Number(req.params.id));
   if (!info.changes) return res.status(404).json({ error: "Appointment not found." });
-  res.json(db.prepare("SELECT * FROM appointments WHERE id=?").get(Number(req.params.id)));
+  const updated = db.prepare("SELECT a.*, d.name AS doctor_name, d.specialty, d.fee FROM appointments a JOIN doctors d ON d.id = a.doctor_id WHERE a.id = ?").get(Number(req.params.id));
+  syncAppointmentToMongo(updated);
+  res.json(updated);
 });
 
 // Delete appointment (Delete)
 app.delete("/api/appointments/:id", (req, res) => {
   const info = db.prepare("DELETE FROM appointments WHERE id=?").run(Number(req.params.id));
   if (!info.changes) return res.status(404).json({ error: "Appointment not found." });
+  deleteAppointmentFromMongo(Number(req.params.id));
   res.json({ deleted: true, id: Number(req.params.id) });
 });
 
