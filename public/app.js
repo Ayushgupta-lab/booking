@@ -202,13 +202,11 @@ function setAuthTab(tab) {
   if (tabs) tabs.dataset.active = tab;   // slides the white pill under the active tab
   const showForm = tab === "login" ? $("#loginForm") : $("#registerForm");
   const hideForm = tab === "login" ? $("#registerForm") : $("#loginForm");
-  showForm.classList.add("switching");
-  hideForm.classList.add("switching");
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    showForm.hidden = false;
-    hideForm.hidden = true;
-    showForm.classList.remove("switching");
-  }));
+  hideForm.hidden = true;
+  showForm.hidden = false;
+  showForm.classList.remove("enter");
+  void showForm.offsetWidth;      // restart the entrance animation
+  showForm.classList.add("enter");
   const m = $("#authMsg");
   if (m) m.hidden = true;
   applyAuthHeaders();
@@ -369,12 +367,17 @@ function navigate(view) {
   $("#navLinks").classList.remove("open");
   window.scrollTo({ top: 0, behavior: "smooth" });
   $("#emergencyBtn").classList.toggle("active", view === "emergency");
+  if (view === "home") {
+    initCounters();
+    initTimeline();
+  }
   if (view === "my") {
     if (state.user) showAllMine();          // signed in → account bookings
     else if (state.myPhone) loadMyBookings(); // guest → phone search
   }
   if (view === "admin") loadAdmin();
   if (view === "emergency") renderEmergency();
+  scheduleReveal();
 }
 
 document.addEventListener("click", (e) => {
@@ -390,15 +393,62 @@ const DEPTS = [
 
 async function loadHome() {
   $("#deptGrid").innerHTML = DEPTS.map(([name, emoji]) =>
-    `<button class="dept-card" data-nav="book" data-specialty="${esc(name)}">
+    `<button class="dept-card tilt" data-nav="book" data-specialty="${esc(name)}">
        <span class="dept-emoji">${emoji}</span>${esc(name)}
      </button>`).join("");
+  loadHomeDoctors();
   try {
     const s = await api("/api/stats");
-    $("#statDoctors").textContent = s.doctors;
-    $("#statBookings").textContent = s.total;
+    const docEl = $("#statDoctors");
+    if (docEl && Number(s.doctors) > 0) docEl.dataset.target = String(s.doctors);
+    const bkEl = $("#statBookings");
+    if (bkEl && Number(s.total) > 0) bkEl.dataset.target = String(s.total);
   } catch { /* keep static fallback */ }
+  initCounters();
+  initTimeline();
+  initSandbox();
+  scanReveals();
+  initTilt();
 }
+
+async function loadHomeDoctors() {
+  const grid = $("#homeDoctorGrid");
+  if (!grid) return;
+  try {
+    const list = await api("/api/doctors");
+    const today = new Date().toISOString().slice(0, 10);
+    const currentDay = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(today + "T12:00:00").getDay()];
+    grid.innerHTML = list.slice(0, 4).map((d, i) => {
+      const worksToday = d.days?.includes(currentDay);
+      return `
+      <article class="home-doc-card tilt" data-reveal="fade-up" style="--i:${i}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div class="hd-ava" style="background:${AVATAR_COLORS[i % AVATAR_COLORS.length]}">${initials(d.name)}</div>
+          <span class="chip ${worksToday ? 'chip-ok' : 'chip-info'}">${worksToday ? '● Available Today' : '● Next: Tomorrow'}</span>
+        </div>
+        <div class="hd-body" style="margin-top:0.6rem">
+          <strong>${esc(d.name)}</strong>
+          <span>${esc(d.specialty)} · ${esc(d.department || 'Senior Consultant')}</span>
+          <div class="hd-meta" style="margin-top:0.4rem">
+            <span class="hd-rating">★ ${d.rating || 4.9} (${d.experience || 8}+ yrs)</span>
+            <span class="hd-fee">₹${d.fee}</span>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" type="button" data-book-doc="${d.id}" style="margin-top:0.8rem">Book Consultation →</button>
+      </article>`;
+    }).join("");
+    initTilt();
+    scanReveals();
+  } catch { grid.innerHTML = ""; }
+}
+
+document.addEventListener("click", (e) => {
+  const pick = e.target.closest("[data-book-doc], [data-home-doc]");
+  if (!pick) return;
+  const id = pick.dataset.bookDoc || pick.dataset.homeDoc;
+  navigate("book");
+  setTimeout(() => document.querySelector(`#doctorGrid [data-doctor="${id}"]`)?.click(), 80);
+});
 
 /* ================================== BOOK ====================================== */
 async function loadDoctors() {
@@ -1884,15 +1934,453 @@ async function checkDbStatus() {
   } catch {}
 }
 
+/* ============================ MOTION / MICRO-INTERACTIONS ==================== */
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let revealQueued = false;
+
+let revealObserver = null;
+
+function revealInView() {
+  if (reduceMotion) {
+    $$("[data-reveal]").forEach((el) => el.classList.add("in"));
+    return;
+  }
+  if ("IntersectionObserver" in window) {
+    if (!revealObserver) {
+      revealObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("in");
+              revealObserver.unobserve(entry.target);
+            }
+          });
+        },
+        { threshold: 0.08, rootMargin: "0px 0px -30px 0px" }
+      );
+    }
+    $$("[data-reveal]:not(.in)").forEach((el) => revealObserver.observe(el));
+  } else {
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    $$("[data-reveal]:not(.in)").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.height === 0) return;
+      if (r.top < vh * 0.94 && r.bottom > 0) el.classList.add("in");
+    });
+  }
+}
+
+function scheduleReveal() {
+  if (reduceMotion || revealQueued) return;
+  revealQueued = true;
+  requestAnimationFrame(() => { revealQueued = false; revealInView(); });
+}
+
+function scanReveals() {
+  if (reduceMotion) return;
+  document.documentElement.classList.add("fx");
+  $$(".section-title, .feature-card, .dept-card, .page-head, .slot-panel, .hero-copy, .hero-art, .appt-card, .doctor-card, .emg-card, .pm-card")
+    .forEach((el) => {
+      if (el.dataset.revealReady) return;
+      el.dataset.revealReady = "1";
+      el.dataset.reveal = "";
+      const sibs = el.parentElement ? Array.from(el.parentElement.children) : [];
+      el.style.setProperty("--i", String(Math.min(Math.max(sibs.indexOf(el), 0), 5)));
+    });
+  revealInView();
+}
+
+function initTilt() {
+  if (reduceMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  $$(".feature-card, .dept-card, .testi-card, .home-doc-card").forEach((card) => {
+    if (card.dataset.tiltReady) return;
+    card.dataset.tiltReady = "1";
+    card.classList.add("tilt");
+    card.addEventListener("pointermove", (e) => {
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width;
+      const py = (e.clientY - r.top) / r.height;
+      card.style.setProperty("--mx", `${(px * 100).toFixed(1)}%`);
+      card.style.setProperty("--my", `${(py * 100).toFixed(1)}%`);
+      card.style.transform = `perspective(760px) rotateX(${((0.5 - py) * 5).toFixed(2)}deg) rotateY(${((px - 0.5) * 5).toFixed(2)}deg) translateY(-3px)`;
+    });
+    card.addEventListener("pointerleave", () => { card.style.transform = ""; });
+  });
+}
+
+function animateCount(el, to) {
+  if (!el) return;
+  const target = Number(to);
+  if (!Number.isFinite(target)) { el.textContent = String(to); return; }
+  const from = Number(String(el.textContent).replace(/[^\d.]/g, "")) || 0;
+  if (reduceMotion || from === target) { el.textContent = target.toLocaleString("en-IN"); return; }
+  el.classList.add("counting");
+  const dur = 900;
+  const t0 = performance.now();
+  const done = () => { el.textContent = target.toLocaleString("en-IN"); el.classList.remove("counting"); };
+  const tick = (t) => {
+    const p = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (target - from) * eased).toLocaleString("en-IN");
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  setTimeout(done, dur + 200);   // guarantees the final number even if frames are throttled
+}
+
+function initHeroParallax() {
+  const hero = document.querySelector(".hero");
+  const art = document.querySelector(".hero-art");
+  if (!hero || !art || reduceMotion || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+  const floaters = $$(".parallax-card, .parallax-elem", hero).map((el) => ({ el, speed: Number(el.dataset.speed || 0) }));
+  hero.addEventListener("pointermove", (e) => {
+    const r = hero.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5;
+    const y = (e.clientY - r.top) / r.height - 0.5;
+    art.style.transform = `perspective(1000px) rotateY(${(x * 7).toFixed(2)}deg) rotateX(${(-y * 6).toFixed(2)}deg)`;
+    // individual translate keeps the CSS float animations intact
+    floaters.forEach(({ el, speed }) => {
+      el.style.translate = `${(x * speed * 260).toFixed(1)}px ${(y * speed * 160).toFixed(1)}px`;
+    });
+  });
+  hero.addEventListener("pointerleave", () => {
+    art.style.transform = "";
+    floaters.forEach(({ el }) => { el.style.translate = ""; });
+  });
+}
+
+function animateNumber(el, target, decimals = 0) {
+  const done = () => {
+    el.textContent = decimals ? target.toFixed(decimals) : Math.round(target).toLocaleString("en-IN");
+  };
+  if (reduceMotion) { done(); return; }
+  const dur = 1500;
+  const t0 = performance.now();
+  const tick = (t) => {
+    const p = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    const v = target * eased;
+    el.textContent = decimals ? v.toFixed(decimals) : Math.round(v).toLocaleString("en-IN");
+    if (p < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  setTimeout(done, dur + 250);   // guarantees the final number if frames are throttled
+}
+
+function initCounters() {
+  const els = $$(".counter-num");
+  if (!els.length) return;
+  const run = (el) => {
+    if (el.dataset.counted) return;
+    el.dataset.counted = "1";
+    animateNumber(el, Number(el.dataset.target || 0), Number(el.dataset.decimals || 0));
+  };
+  if ("IntersectionObserver" in window) {
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          run(entry.target);
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    els.forEach((el) => {
+      if (!el.dataset.counted) obs.observe(el);
+    });
+  } else {
+    const check = () => {
+      const vh = window.innerHeight;
+      els.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.height > 0 && r.top < vh * 0.92 && r.bottom > 0) run(el);
+      });
+    };
+    window.addEventListener("scroll", check, { passive: true });
+    check();
+  }
+}
+
+function initTimeline() {
+  const section = document.querySelector(".timeline-section");
+  const fill = $("#timelineProgress");
+  if (!section || !fill) return;
+  const items = $$(".timeline-item");
+  const update = () => {
+    const r = section.getBoundingClientRect();
+    const span = r.height * 0.78 || 1;
+    const pct = Math.min(1, Math.max(0, ((window.innerHeight * 0.75) - r.top) / span));
+    fill.style.height = `${(pct * 100).toFixed(1)}%`;
+
+    // Highlight active timeline items as scroll passes them
+    items.forEach((item) => {
+      const ir = item.getBoundingClientRect();
+      item.classList.toggle("active", ir.top < window.innerHeight * 0.75);
+    });
+  };
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  update();
+}
+
+function initFaq() {
+  $$(".faq-question").forEach((btn) => {
+    btn.setAttribute("aria-expanded", "false");
+    btn.addEventListener("click", () => {
+      const item = btn.closest(".faq-item");
+      const willOpen = !item.classList.contains("open");
+      $$(".faq-item.open").forEach((o) => {
+        o.classList.remove("open");
+        o.querySelector(".faq-question")?.setAttribute("aria-expanded", "false");
+      });
+      item.classList.toggle("open", willOpen);
+      btn.setAttribute("aria-expanded", String(willOpen));
+    });
+  });
+}
+
+function initScrollProgress() {
+  const bar = $("#scrollProgress");
+  const ring = $("#progressRingBar");
+  const topBtn = $("#backToTopBtn");
+  const nav = $(".navbar");
+  const scrollBtn = $("#heroScrollBtn");
+  const heroDeck = $("#heroDeckMockup");
+
+  if (scrollBtn) {
+    scrollBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.querySelector("#stats-section")?.scrollIntoView({ behavior: "smooth" });
+    });
+  }
+
+  if (topBtn) {
+    topBtn.addEventListener("click", () => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
+
+  const update = () => {
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const pct = max > 0 ? Math.min(100, Math.max(0, (scrollY / max) * 100)) : 0;
+
+    if (bar) bar.style.width = `${pct}%`;
+
+    // Circular progress ring on back to top button
+    if (ring) {
+      const circ = 119.38;
+      const offset = circ - (circ * pct) / 100;
+      ring.style.strokeDashoffset = String(offset);
+    }
+
+    // Toggle Back to Top button
+    if (topBtn) {
+      topBtn.classList.toggle("visible", scrollY > 280);
+    }
+
+    // Navbar scrolled morphing state
+    if (nav) {
+      nav.classList.toggle("is-scrolled", scrollY > 20);
+    }
+
+    // High-level 3D perspective pitch on hero deck terminal mockup on scroll
+    if (heroDeck && !reduceMotion && scrollY < 900) {
+      const pitch = Math.min(14, (scrollY * 0.022)).toFixed(2);
+      const moveY = (scrollY * 0.1).toFixed(1);
+      const scale = Math.max(0.94, 1 - scrollY * 0.00014).toFixed(3);
+      heroDeck.style.transform = `perspective(1100px) rotateX(${pitch}deg) translateY(${moveY}px) scale(${scale})`;
+    }
+
+    // Subtle scroll parallax on hero floating elements
+    if (!reduceMotion && scrollY < 900) {
+      $$(".parallax-card, .parallax-elem").forEach((el) => {
+        const speed = Number(el.dataset.speed || 0.1);
+        el.style.transform = `translateY(${(scrollY * speed * 0.8).toFixed(1)}px)`;
+      });
+    }
+  };
+
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  update();
+}
+
+function initCursorSpotlight() {
+  if (reduceMotion || !window.matchMedia("(pointer: fine)").matches) return;
+  const spotlight = $("#cursorSpotlight");
+  if (!spotlight) return;
+  window.addEventListener("pointermove", (e) => {
+    document.documentElement.style.setProperty("--spot-x", `${e.clientX}px`);
+    document.documentElement.style.setProperty("--spot-y", `${e.clientY}px`);
+  }, { passive: true });
+}
+
+function initWordScrub() {
+  const section = $("#kineticStatement");
+  const words = $$(".scrub-word");
+  if (!section || !words.length) return;
+
+  const update = () => {
+    const r = section.getBoundingClientRect();
+    const vh = window.innerHeight;
+    // Section starts lighting up when top reaches 88% of screen height
+    // Fully illuminated when center reaches 42% of screen height
+    const startY = vh * 0.88;
+    const endY = vh * 0.42;
+    const progress = Math.min(1, Math.max(0, (startY - r.top) / (startY - endY)));
+
+    const litCount = Math.floor(progress * words.length);
+    words.forEach((w, idx) => {
+      w.classList.toggle("lit", idx <= litCount);
+    });
+  };
+
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  update();
+}
+
+function initStackingCards() {
+  const cards = $$(".stack-card");
+  if (cards.length < 2) return;
+
+  const update = () => {
+    cards.forEach((card, idx) => {
+      if (idx === cards.length - 1) return;
+      const nextCard = cards[idx + 1];
+      if (!nextCard) return;
+      const nr = nextCard.getBoundingClientRect();
+      const stickyAnchor = 82 + (idx + 1) * 22;
+      const overlap = stickyAnchor + 48 - nr.top;
+
+      if (overlap > 0) {
+        const thirdCard = cards[idx + 2];
+        let isDeep = false;
+        if (thirdCard) {
+          const tr = thirdCard.getBoundingClientRect();
+          const thirdAnchor = 82 + (idx + 2) * 22;
+          if (thirdAnchor + 48 - tr.top > 0) isDeep = true;
+        }
+        card.classList.toggle("is-deep-dimmed", isDeep);
+        card.classList.toggle("is-dimmed", !isDeep);
+      } else {
+        card.classList.remove("is-dimmed", "is-deep-dimmed");
+      }
+    });
+  };
+
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update);
+  update();
+}
+
+function initSandbox() {
+  const chips = $$(".sandbox-chip");
+  const docInfo = $("#sandboxDocPreview");
+  const slotGrid = $("#sandboxSlotGrid");
+  const alexBtn = $("#openAlexFromStack");
+  const bentoAlexBtn = $("#openAlexFromBento");
+
+  const openAlexModal = () => {
+    $("#alexPanel")?.removeAttribute("hidden");
+    $("#alexText")?.focus();
+  };
+
+  if (alexBtn && !alexBtn.dataset.bound) {
+    alexBtn.dataset.bound = "1";
+    alexBtn.addEventListener("click", openAlexModal);
+  }
+  if (bentoAlexBtn && !bentoAlexBtn.dataset.bound) {
+    bentoAlexBtn.dataset.bound = "1";
+    bentoAlexBtn.addEventListener("click", openAlexModal);
+  }
+
+  if (!chips.length || !docInfo || !slotGrid) return;
+
+  const renderSandbox = (spec) => {
+    const doc = state.doctors?.find((d) => d.specialty === spec) || state.doctors?.[0];
+    if (!doc) return;
+
+    docInfo.innerHTML = `
+      <div style="display:flex; gap:0.9rem; align-items:center;">
+        <div class="avatar" style="width:48px; height:48px; border-radius:12px; background:#0d9488; font-weight:700;">${initials(doc.name)}</div>
+        <div>
+          <strong style="font-size:1.02rem; color:var(--navy); display:block;">${esc(doc.name)}</strong>
+          <span style="font-size:0.82rem; color:var(--teal-700); font-weight:600;">${esc(doc.specialty)}</span>
+        </div>
+      </div>
+      <div style="font-size:0.82rem; color:var(--muted); line-height:1.55; margin-top:0.4rem;">
+        ${esc(doc.bio || 'Senior Department Specialist with over ' + (doc.experience || 8) + ' years of clinical excellence.')}
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:0.8rem; border-top:1px solid var(--line);">
+        <span style="font-weight:700; color:var(--navy);">Fee: ₹${doc.fee}</span>
+        <span class="chip chip-ok">★ ${doc.rating || 4.9}</span>
+      </div>
+    `;
+
+    const sampleSlots = ["09:00 AM", "10:00 AM", "11:30 AM", "02:00 PM", "03:30 PM", "05:00 PM"];
+    slotGrid.innerHTML = sampleSlots.map((time) => `
+      <button type="button" class="sandbox-slot-btn" data-sandbox-time="${time}">
+        <span>${time}</span>
+      </button>
+    `).join("");
+  };
+
+  chips.forEach((chip) => {
+    if (chip.dataset.bound) return;
+    chip.dataset.bound = "1";
+    chip.addEventListener("click", () => {
+      chips.forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      renderSandbox(chip.dataset.spec);
+    });
+  });
+
+  if (!slotGrid.dataset.bound) {
+    slotGrid.dataset.bound = "1";
+    slotGrid.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-sandbox-time]");
+      if (!btn) return;
+      const activeChip = $(".sandbox-chip.active");
+      const spec = activeChip?.dataset.spec || "Cardiology";
+      const doc = state.doctors?.find((d) => d.specialty === spec) || state.doctors?.[0];
+      if (doc) {
+        navigate("book");
+        setTimeout(() => {
+          document.querySelector(`#doctorGrid [data-doctor="${doc.id}"]`)?.click();
+        }, 90);
+      }
+    });
+  }
+
+  // Initial render when doctors are ready
+  if (state.doctors?.length) {
+    renderSandbox("Cardiology");
+  }
+}
+
 (async function init() {
+  initScrollProgress();
+  initCursorSpotlight();
+  initWordScrub();
+  initStackingCards();
+  initTimeline();
+  initCounters();
   await refreshUser();
   await loadDoctors();
   populateSpecialtyFilter();
   await loadHome();
   await loadDoctorMgmt();
   populateEmgSpecialties();
+  initSandbox();
   $("#apptDate").value = isoOf(1);
   $("#apptDate").min = isoOf(0);
   renderQuickDates();
+  scanReveals();
+  initTilt();
+  initHeroParallax();
+  initFaq();
+  window.addEventListener("scroll", scheduleReveal, { passive: true });
+  window.addEventListener("resize", scheduleReveal);
   checkDbStatus();
 })();

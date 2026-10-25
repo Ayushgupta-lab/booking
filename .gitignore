@@ -3,8 +3,9 @@ node_modules/
 .freebuff/
 .env
 .env.local
+hospital.db
 hospital.db-shm
 hospital.db-wal
+backups/
 .DS_Store
 Thumbs.db
-

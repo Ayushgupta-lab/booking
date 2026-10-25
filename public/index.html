@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+  <div class="cursor-spotlight" id="cursorSpotlight" aria-hidden="true"></div>
   <!-- ============================== NAVBAR ============================== -->
   <header class="navbar">
     <div class="container nav-inner">
@@ -42,60 +44,813 @@
   <main>
     <!-- =============================== HOME =============================== -->
     <section id="view-home" class="view active">
+      <!-- Ambient Parallax Background Orbs -->
+      <div class="ambient-glows" aria-hidden="true">
+        <div class="ambient-orb orb-1"></div>
+        <div class="ambient-orb orb-2"></div>
+        <div class="ambient-orb orb-3"></div>
+      </div>
+
+      <!-- HERO SECTION -->
       <div class="hero">
+        <!-- Live Glowing ECG Heartbeat Line -->
+        <div class="hero-ecg-wrap" aria-hidden="true">
+          <svg class="hero-ecg-svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+            <path class="ecg-bg-line" d="M0,60 L200,60 L230,60 L245,20 L260,105 L275,45 L290,75 L305,60 L500,60 L530,60 L545,15 L560,110 L575,40 L590,80 L605,60 L800,60 L830,60 L845,25 L860,100 L875,45 L890,70 L905,60 L1200,60" fill="none" stroke="rgba(20, 184, 166, 0.12)" stroke-width="2" />
+            <path class="ecg-pulse-line" d="M0,60 L200,60 L230,60 L245,20 L260,105 L275,45 L290,75 L305,60 L500,60 L530,60 L545,15 L560,110 L575,40 L590,80 L605,60 L800,60 L830,60 L845,25 L860,100 L875,45 L890,70 L905,60 L1200,60" fill="none" stroke="url(#ecgGlowGrad)" stroke-width="2.5" />
+            <defs>
+              <linearGradient id="ecgGlowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="50%" stop-color="#2dd4bf" />
+                <stop offset="100%" stop-color="#10b981" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
         <div class="container hero-grid">
-          <div class="hero-copy">
-            <span class="badge badge-light">● Open 24×7 · Emergency care available</span>
-            <h1>Your health, <em>booked in seconds.</em></h1>
-            <p>Consult top specialists, book real-time slots online, and shift your appointment instantly if an emergency gets in the way — no calls, no queues.</p>
-            <div class="hero-actions">
-              <button class="btn btn-primary btn-lg" data-nav="book">Book an Appointment</button>
-              <button class="btn btn-ghost btn-lg" data-nav="my">Manage My Booking</button>
+          <div class="hero-copy" data-reveal="fade-up">
+            <div class="hero-badge-wrap">
+              <span class="badge badge-pulse">
+                <span class="pulse-indicator"></span>
+                <span>Open 24×7 · Live Hospital Triage Active</span>
+              </span>
             </div>
-            <div class="hero-stats">
-              <div><strong id="statDoctors">8</strong><span>Specialists</span></div>
-              <div><strong id="statBookings">0</strong><span>Appointments</span></div>
-              <div><strong>4.8★</strong><span>Patient rating</span></div>
-              <div><strong>&lt;2 min</strong><span>To book</span></div>
+            <h1 class="hero-title">
+              Your health, <br />
+              <span class="shimmer-text">booked in seconds.</span>
+            </h1>
+            <p class="hero-subtext">
+              Consult top hospital specialists, book real-time verified slots online, and shift your appointment instantly in 1 tap if an emergency arises — zero queues, zero friction.
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary btn-lg btn-glow" data-nav="book">
+                <span>Book an Appointment</span>
+                <span class="btn-arrow">→</span>
+              </button>
+              <button class="btn btn-ghost btn-lg" data-nav="my">Manage My Booking</button>
+              <button class="btn btn-danger-soft btn-lg" data-nav="emergency">🚨 1-Tap Emergency</button>
+            </div>
+            <div class="hero-trust-row">
+              <div class="trust-avatars">
+                <span class="trust-ava" style="background:#0284c7">AP</span>
+                <span class="trust-ava" style="background:#0d9488">SK</span>
+                <span class="trust-ava" style="background:#8b5cf6">RV</span>
+                <span class="trust-ava" style="background:#f59e0b">NJ</span>
+              </div>
+              <div class="trust-meta">
+                <div class="stars">★★★★★ <strong class="rating-val">4.9/5</strong></div>
+                <span>Trusted by 10,000+ patients this year</span>
+              </div>
             </div>
           </div>
-          <div class="hero-art" aria-hidden="true">
-            <div class="hero-card hero-card-1">
+
+          <div class="hero-art" id="heroArt" aria-hidden="true">
+            <!-- 3D Interactive Terminal Deck Mockup -->
+            <div class="hero-deck-mockup" id="heroDeckMockup">
+              <div class="deck-window-bar">
+                <div class="deck-dots">
+                  <span class="d-dot red"></span>
+                  <span class="d-dot yellow"></span>
+                  <span class="d-dot green"></span>
+                </div>
+                <div class="deck-title">MediCare OS · Live Scheduling Terminal</div>
+                <div class="deck-status-pill">● 14 Specialists Live</div>
+              </div>
+              <div class="deck-body">
+                <div class="deck-doc-strip">
+                  <div class="avatar" style="width:40px; height:40px; border-radius:10px; background:#0d9488; font-weight:700;">AS</div>
+                  <div>
+                    <strong style="display:block; font-size:0.92rem; color:var(--navy);">Dr. Aisha Sharma</strong>
+                    <span style="font-size:0.75rem; color:var(--teal-700); font-weight:600;">Cardiology · 12 yrs exp</span>
+                  </div>
+                  <span class="chip chip-ok" style="margin-left:auto;">Today 10:00 AM</span>
+                </div>
+                <div class="deck-live-wave">
+                  <div class="live-dot-pulse"></div>
+                  <span>Real-time slot availability stream:</span>
+                </div>
+                <div class="deck-slots-preview">
+                  <span class="deck-slot-pill booked">09:00 AM (Booked)</span>
+                  <span class="deck-slot-pill available">10:00 AM (Available)</span>
+                  <span class="deck-slot-pill available highlight">11:30 AM (Available)</span>
+                  <span class="deck-slot-pill available">02:00 PM (Available)</span>
+                </div>
+                <div class="deck-emergency-bar">
+                  <span>🚨 Need priority emergency care?</span>
+                  <button class="btn btn-sm btn-danger" type="button" data-nav="emergency">1-Tap Shift</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Floating satellite cards with 3D tilt -->
+            <div class="hero-card hero-card-1 parallax-card" data-speed="-0.08">
               <div class="hero-card-icon">🩺</div>
-              <div><strong>Dr. Aisha Sharma</strong><span>Cardiology · Today 10:00</span></div>
-              <span class="chip chip-ok">Confirmed</span>
+              <div>
+                <strong>Appointment Verified</strong>
+                <span>Today 10:00 AM · Token #24</span>
+              </div>
+              <span class="chip chip-ok">● Live</span>
             </div>
-            <div class="hero-card hero-card-2">
-              <div class="hero-card-icon">⚡</div>
-              <div><strong>Emergency shift</strong><span>Slot moved in 1 tap</span></div>
+
+            <div class="hero-card hero-card-2 parallax-card" data-speed="0.12">
+              <div class="hero-card-icon emg-pulse">⚡</div>
+              <div>
+                <strong>Emergency Shift</strong>
+                <span>Slot moved in 1 tap</span>
+              </div>
+              <span class="chip chip-warn">Auto Swapped</span>
             </div>
-            <div class="hero-cross">✚</div>
+
+            <div class="hero-cross parallax-elem" data-speed="0.18">✚</div>
+            <div class="hero-ring ring-1"></div>
+            <div class="hero-ring ring-2"></div>
+          </div>
+        </div>
+
+        <!-- Scroll down indicator -->
+        <a href="#stats-section" class="hero-scroll-indicator" id="heroScrollBtn" aria-label="Scroll down">
+          <div class="mouse-icon">
+            <span class="mouse-wheel"></span>
+          </div>
+          <span class="scroll-text">Scroll to explore</span>
+          <span class="scroll-arrow">↓</span>
+        </a>
+      </div>
+
+      <!-- INTERACTIVE ANIMATED STATS RIBBON -->
+      <section class="stats-ribbon" id="stats-section">
+        <div class="container stats-grid">
+          <div class="stat-box" data-reveal="fade-up" style="--i:0">
+            <div class="stat-icon-wrap">👨‍⚕️</div>
+            <div class="stat-info">
+              <div class="stat-digit-row"><strong class="counter-num" id="statDoctors" data-target="8">8</strong><span class="stat-plus">+</span></div>
+              <span class="stat-label">Senior Specialists</span>
+              <small class="stat-hint">Across 8 core departments</small>
+            </div>
+          </div>
+          <div class="stat-box" data-reveal="fade-up" style="--i:1">
+            <div class="stat-icon-wrap">📋</div>
+            <div class="stat-info">
+              <div class="stat-digit-row"><strong class="counter-num" id="statBookings" data-target="10420">10,420</strong><span class="stat-plus">+</span></div>
+              <span class="stat-label">Verified Consultations</span>
+              <small class="stat-hint">Real-time slot confirmations</small>
+            </div>
+          </div>
+          <div class="stat-box" data-reveal="fade-up" style="--i:2">
+            <div class="stat-icon-wrap">⭐</div>
+            <div class="stat-info">
+              <div class="stat-digit-row"><strong class="counter-num" id="statRating" data-target="4.9" data-decimals="1">4.9</strong><span class="stat-star">★</span></div>
+              <span class="stat-label">Patient Satisfaction</span>
+              <small class="stat-hint">From 2,800+ patient reviews</small>
+            </div>
+          </div>
+          <div class="stat-box" data-reveal="fade-up" style="--i:3">
+            <div class="stat-icon-wrap">⚡</div>
+            <div class="stat-info">
+              <div class="stat-digit-row"><strong class="counter-num" id="statSpeed" data-target="45">45</strong><span class="stat-unit">s</span></div>
+              <span class="stat-label">Average Booking Time</span>
+              <small class="stat-hint">No lines, zero paperwork</small>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DUAL-DIRECTION INFINITE KINETIC MARQUEE -->
+      <div class="marquee-wrapper" aria-hidden="true">
+        <div class="marquee-track marquee-track-1">
+          <div class="marquee-content">
+            <span>✚ CARDIOLOGY</span>
+            <span>✚ NEUROLOGY</span>
+            <span>✚ ROBOTIC SURGERY</span>
+            <span>✚ PEDIATRICS</span>
+            <span>✚ ONCOLOGY</span>
+            <span>✚ DERMATOLOGY</span>
+            <span>✚ ORTHOPEDICS</span>
+            <span>✚ 24×7 TRAUMA CARE</span>
+            <span>✚ GENERAL MEDICINE</span>
+            <span>✚ GYNECOLOGY &amp; OBSTETRICS</span>
+          </div>
+          <div class="marquee-content" aria-hidden="true">
+            <span>✚ CARDIOLOGY</span>
+            <span>✚ NEUROLOGY</span>
+            <span>✚ ROBOTIC SURGERY</span>
+            <span>✚ PEDIATRICS</span>
+            <span>✚ ONCOLOGY</span>
+            <span>✚ DERMATOLOGY</span>
+            <span>✚ ORTHOPEDICS</span>
+            <span>✚ 24×7 TRAUMA CARE</span>
+            <span>✚ GENERAL MEDICINE</span>
+            <span>✚ GYNECOLOGY &amp; OBSTETRICS</span>
+          </div>
+        </div>
+        <div class="marquee-track marquee-track-2">
+          <div class="marquee-content">
+            <span>⚡ 1-TAP EMERGENCY SLOT SHIFT</span>
+            <span>✦ ZERO WAITING ROOM QUEUES</span>
+            <span>✦ REAL-TIME DATABASE SYNC</span>
+            <span>✦ INSTANT DIGITAL SMS PASS</span>
+            <span>✦ 10,000+ HAPPY PATIENTS</span>
+            <span>✦ 100% SECURE CHECKOUT</span>
+            <span>✦ 4.9★ RATED SPECIALISTS</span>
+          </div>
+          <div class="marquee-content" aria-hidden="true">
+            <span>⚡ 1-TAP EMERGENCY SLOT SHIFT</span>
+            <span>✦ ZERO WAITING ROOM QUEUES</span>
+            <span>✦ REAL-TIME DATABASE SYNC</span>
+            <span>✦ INSTANT DIGITAL SMS PASS</span>
+            <span>✦ 10,000+ HAPPY PATIENTS</span>
+            <span>✦ 100% SECURE CHECKOUT</span>
+            <span>✦ 4.9★ RATED SPECIALISTS</span>
           </div>
         </div>
       </div>
 
+      <!-- KINETIC SCROLL STATEMENT WITH SCROLL-SCRUBBED ILLUMINATION -->
+      <section class="kinetic-statement-section" id="kineticStatement">
+        <div class="container text-center">
+          <span class="section-badge">💡 A New Standard</span>
+          <h2 class="kinetic-text" id="kineticText">
+            <span class="scrub-word">We</span>
+            <span class="scrub-word">believe</span>
+            <span class="scrub-word">hospital</span>
+            <span class="scrub-word">appointments</span>
+            <span class="scrub-word">should</span>
+            <span class="scrub-word">be</span>
+            <span class="scrub-word highlight">as</span>
+            <span class="scrub-word highlight">effortless</span>
+            <span class="scrub-word highlight">as</span>
+            <span class="scrub-word highlight">sending</span>
+            <span class="scrub-word highlight">a</span>
+            <span class="scrub-word highlight">message</span>
+            <span class="scrub-word">—</span>
+            <span class="scrub-word">instant</span>
+            <span class="scrub-word">live</span>
+            <span class="scrub-word">slot</span>
+            <span class="scrub-word">confirmation,</span>
+            <span class="scrub-word">zero</span>
+            <span class="scrub-word">queues,</span>
+            <span class="scrub-word">and</span>
+            <span class="scrub-word">the</span>
+            <span class="scrub-word">freedom</span>
+            <span class="scrub-word">to</span>
+            <span class="scrub-word">shift</span>
+            <span class="scrub-word">your</span>
+            <span class="scrub-word">appointment</span>
+            <span class="scrub-word">anytime</span>
+            <span class="scrub-word">emergency</span>
+            <span class="scrub-word">strikes.</span>
+          </h2>
+        </div>
+      </section>
+
+      <!-- STICKY STACKING CARDS SHOWCASE -->
+      <section class="stacking-section" id="advantage-section">
+        <div class="container">
+          <div class="section-head center" data-reveal="fade-up">
+            <span class="section-badge">🌟 Unmatched Innovation</span>
+            <h2 class="section-title">Engineered to be 10× Better</h2>
+            <p class="section-sub">Experience the next-generation architecture powering our hospital booking ecosystem.</p>
+          </div>
+
+          <div class="stacking-cards-wrap">
+            <!-- Stack Card 1 -->
+            <div class="stack-card stack-card-1" style="--stack-idx: 1">
+              <div class="stack-card-inner">
+                <div class="stack-card-copy">
+                  <div class="stack-badge">🚨 Priority Innovation</div>
+                  <h3>Intelligent Emergency Slot Shift &amp; Swap</h3>
+                  <p>When unexpected emergencies happen, you don't lose your booking or pay penalties. Our algorithm lets you shift to any future slot or automatically exchange slots with another patient holding an open booking in 1 tap.</p>
+                  <div class="stack-metrics">
+                    <div><strong>0 min</strong><span>Reschedule time</span></div>
+                    <div><strong>₹0</strong><span>Cancellation penalty</span></div>
+                    <div><strong>100%</strong><span>Instant sync</span></div>
+                  </div>
+                  <button class="btn btn-primary" data-nav="emergency">Experience Emergency Shift →</button>
+                </div>
+                <div class="stack-card-visual">
+                  <div class="swap-demo-card">
+                    <div class="swap-patient-row">
+                      <div class="swap-patient-pill p1">
+                        <span class="swap-ava">PM</span>
+                        <div><strong>Priya M.</strong><span>Today 10:00 AM</span></div>
+                        <span class="chip chip-warn">Emergency Shift</span>
+                      </div>
+                      <div class="swap-arrow-indicator">
+                        <span class="swap-pulse-line"></span>
+                        <span class="swap-icon">⇄</span>
+                      </div>
+                      <div class="swap-patient-pill p2">
+                        <span class="swap-ava" style="background:#0284c7">RS</span>
+                        <div><strong>Rahul S.</strong><span>Tomorrow 11:30 AM</span></div>
+                        <span class="chip chip-ok">Auto Swapped</span>
+                      </div>
+                    </div>
+                    <div class="swap-verified-footer">
+                      <span class="verified-dot"></span>
+                      <span>Automated 2-way patient notification sent via SMS</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stack Card 2 -->
+            <div class="stack-card stack-card-2" style="--stack-idx: 2">
+              <div class="stack-card-inner">
+                <div class="stack-card-copy">
+                  <div class="stack-badge" style="background:rgba(2,132,199,0.15); color:#0284c7">⚡ Live Infrastructure</div>
+                  <h3>Direct Doctor Calendar &amp; Slot Matrix</h3>
+                  <p>Say goodbye to “we will call you back to confirm”. Every doctor’s schedule connects directly to our database. When you select a slot, it is reserved with millisecond concurrency protection.</p>
+                  <div class="stack-metrics">
+                    <div><strong>&lt; 50ms</strong><span>API latency</span></div>
+                    <div><strong>8 Depts</strong><span>Live status</span></div>
+                    <div><strong>100%</strong><span>Zero double bookings</span></div>
+                  </div>
+                  <button class="btn btn-primary" data-nav="book">Browse Live Schedule →</button>
+                </div>
+                <div class="stack-card-visual">
+                  <div class="calendar-demo-card">
+                    <div class="cal-demo-head">
+                      <strong>Dr. Aisha Sharma</strong>
+                      <span class="chip chip-ok">● Live Schedule</span>
+                    </div>
+                    <div class="cal-demo-slots">
+                      <div class="cal-demo-slot booked"><span>09:00 AM</span><small>Booked</small></div>
+                      <div class="cal-demo-slot live-pulse"><span>10:00 AM</span><small>Available</small></div>
+                      <div class="cal-demo-slot live-pulse"><span>11:30 AM</span><small>Available</small></div>
+                      <div class="cal-demo-slot booked"><span>02:00 PM</span><small>Booked</small></div>
+                      <div class="cal-demo-slot live-pulse"><span>03:30 PM</span><small>Available</small></div>
+                      <div class="cal-demo-slot live-pulse"><span>05:00 PM</span><small>Available</small></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Stack Card 3 -->
+            <div class="stack-card stack-card-3" style="--stack-idx: 3">
+              <div class="stack-card-inner">
+                <div class="stack-card-copy">
+                  <div class="stack-badge" style="background:rgba(139,92,246,0.15); color:#8b5cf6">🤖 Natural Language AI</div>
+                  <h3>Alex — Autonomous AI Dispatcher</h3>
+                  <p>Don't want to type through forms? Talk to Alex using voice or text. Just say “I need a cardiologist tomorrow morning” and Alex auto-finds the top specialist, checks consultation fees, and books the slot.</p>
+                  <div class="stack-metrics">
+                    <div><strong>Voice</strong><span>Speech enabled</span></div>
+                    <div><strong>24×7</strong><span>Instant answers</span></div>
+                    <div><strong>Smart</strong><span>Triage assistant</span></div>
+                  </div>
+                  <button class="btn btn-primary" id="openAlexFromStack">Chat with Alex 🤖 →</button>
+                </div>
+                <div class="stack-card-visual">
+                  <div class="ai-demo-card">
+                    <div class="ai-voice-bar-wrap">
+                      <div class="wave-bar"></div>
+                      <div class="wave-bar"></div>
+                      <div class="wave-bar"></div>
+                      <div class="wave-bar"></div>
+                      <div class="wave-bar"></div>
+                    </div>
+                    <div class="ai-chat-bubble user">
+                      <span>“Book me a consultation with Dr. Aisha tomorrow at 10 AM”</span>
+                    </div>
+                    <div class="ai-chat-bubble bot">
+                      <span>“Done! Dr. Aisha Sharma has an open slot tomorrow at 10:00 AM. Consultation fee is ₹800. Ready to confirm?”</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SMART CLINICAL ECOSYSTEM (BENTO GRID SHOWCASE) -->
+      <section class="bento-section" id="bento-ecosystem">
+        <div class="container">
+          <div class="section-head center" data-reveal="fade-up">
+            <span class="section-badge">✨ Intelligent Ecosystem</span>
+            <h2 class="section-title">Engineered for Precision &amp; Speed</h2>
+            <p class="section-sub">A next-generation hospital operating core designed for zero waiting room friction and instant patient empowerment.</p>
+          </div>
+
+          <div class="bento-grid">
+            <!-- Bento 1: Live Telemetry & Concurrency Core -->
+            <div class="bento-card bento-wide bento-dark" data-reveal="fade-up">
+              <div class="bento-mesh-glow"></div>
+              <div class="bento-header">
+                <span class="bento-pill"><span class="bento-live-dot"></span> 8 Departments Live</span>
+                <span class="bento-tag">Zero Concurrency Drift</span>
+              </div>
+              <div class="bento-body">
+                <h3>Live Hospital Concurrency Engine</h3>
+                <p>When thousands of patients view slots simultaneously, our transactional lock engine reserves doctor time at the millisecond layer — preventing double bookings forever.</p>
+                
+                <div class="bento-telemetry-row">
+                  <div class="telemetry-stat">
+                    <span class="t-val">&lt; 12ms</span>
+                    <span class="t-lbl">Slot Lock Latency</span>
+                  </div>
+                  <div class="telemetry-stat">
+                    <span class="t-val">100%</span>
+                    <span class="t-lbl">Zero Overlaps</span>
+                  </div>
+                  <div class="telemetry-stat">
+                    <span class="t-val">8 / 8</span>
+                    <span class="t-lbl">Active Clinics</span>
+                  </div>
+                </div>
+
+                <div class="bento-live-ticker">
+                  <span class="ticker-pulse"></span>
+                  <span class="ticker-text">Live: Dr. Aisha Sharma (Cardiology) slot confirmed 2 mins ago · Token #28</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bento 2: 1-Tap Emergency Reroute -->
+            <div class="bento-card bento-narrow" data-reveal="fade-up" style="--i:1">
+              <div class="bento-header">
+                <span class="bento-icon emg">🚨</span>
+                <span class="bento-badge-danger">Priority Shift</span>
+              </div>
+              <div class="bento-body">
+                <h3>Autonomous Emergency Reroute</h3>
+                <p>Got an emergency? Shift your doctor slot in 1 tap without cancellation penalties or phone calls.</p>
+                <div class="bento-shift-mockup">
+                  <div class="shift-pill-a">Today 10:00 AM <span class="shift-arrow">➔</span></div>
+                  <div class="shift-pill-b">Tomorrow 11:30 AM <span class="chip chip-ok">Auto Swapped</span></div>
+                </div>
+                <button class="btn btn-sm btn-primary" data-nav="emergency">Launch Emergency Shift →</button>
+              </div>
+            </div>
+
+            <!-- Bento 3: Instant Encrypted Digital Pass -->
+            <div class="bento-card bento-third" data-reveal="fade-up" style="--i:2">
+              <div class="bento-header">
+                <span class="bento-icon">🎟️</span>
+                <span class="bento-tag">SMS &amp; Pass Ready</span>
+              </div>
+              <div class="bento-body">
+                <h3>Instant Digital Pass</h3>
+                <p>No paper slips or lost receipts. Encrypted medical QR pass generated instantly on checkout.</p>
+                <div class="bento-pass-preview">
+                  <div class="pass-bar">
+                    <span class="pass-code">MED-9428-TX</span>
+                    <span class="pass-status">VERIFIED</span>
+                  </div>
+                  <div class="pass-qr-sim">
+                    <span class="qr-box"></span>
+                    <div class="qr-meta">
+                      <strong>Token #042</strong>
+                      <small>Dr. Aisha Sharma · Card</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bento 4: Alex Natural AI Assistant -->
+            <div class="bento-card bento-third" data-reveal="fade-up" style="--i:3">
+              <div class="bento-header">
+                <span class="bento-icon">🤖</span>
+                <span class="bento-tag">Voice &amp; Chat</span>
+              </div>
+              <div class="bento-body">
+                <h3>Alex AI Health Concierge</h3>
+                <p>Speak naturally. Alex triages symptoms, suggests top specialists, and books slots hands-free.</p>
+                <div class="bento-voice-bars">
+                  <span class="v-bar"></span>
+                  <span class="v-bar"></span>
+                  <span class="v-bar"></span>
+                  <span class="v-bar"></span>
+                  <span class="v-bar"></span>
+                </div>
+                <button class="btn btn-sm btn-ghost" id="openAlexFromBento">Chat with Alex 🤖</button>
+              </div>
+            </div>
+
+            <!-- Bento 5: Dual Cloud Database Engine -->
+            <div class="bento-card bento-third" data-reveal="fade-up" style="--i:4">
+              <div class="bento-header">
+                <span class="bento-icon">⚡</span>
+                <span class="bento-tag">Dual Sync</span>
+              </div>
+              <div class="bento-body">
+                <h3>Resilient Dual Database</h3>
+                <p>Zero downtime architecture with local SQLite in WAL mode synchronized to MongoDB Atlas Cloud.</p>
+                <div class="bento-sync-indicator">
+                  <div class="sync-node active"><span>SQLite</span><small>WAL Local</small></div>
+                  <div class="sync-line"><span>⇄</span></div>
+                  <div class="sync-node active cloud"><span>Atlas</span><small>Cluster Cloud</small></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- INTERACTIVE LIVE BOOKING SANDBOX -->
+      <section class="sandbox-section">
+        <div class="container">
+          <div class="sandbox-card" data-reveal="fade-up">
+            <div class="sandbox-header">
+              <div>
+                <span class="section-badge">⚡ Interactive Live Sandbox</span>
+                <h2>Try Booking In 10 Seconds</h2>
+                <p>Select a department below to see real-time slots updating directly from the hospital database.</p>
+              </div>
+              <button class="btn btn-primary" data-nav="book">Launch Full Booking Portal →</button>
+            </div>
+            
+            <div class="sandbox-body">
+              <div class="sandbox-specialties" id="sandboxDeptChips">
+                <button class="sandbox-chip active" data-spec="Cardiology">❤️ Cardiology</button>
+                <button class="sandbox-chip" data-spec="Pediatrics">🧸 Pediatrics</button>
+                <button class="sandbox-chip" data-spec="Neurology">🧠 Neurology</button>
+                <button class="sandbox-chip" data-spec="Orthopedics">🦴 Orthopedics</button>
+                <button class="sandbox-chip" data-spec="Dermatology">🧴 Dermatology</button>
+              </div>
+
+              <div class="sandbox-preview-grid">
+                <div class="sandbox-doc-info" id="sandboxDocPreview">
+                  <!-- Filled dynamically by JS -->
+                </div>
+                <div class="sandbox-slots-pane">
+                  <div class="sandbox-slots-head">
+                    <strong>Live Slots for Tomorrow</strong>
+                    <span class="hint-inline">● Real-time sync</span>
+                  </div>
+                  <div class="sandbox-slots-grid" id="sandboxSlotGrid">
+                    <!-- Live slots -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION: WHY CHOOSE MEDICARE -->
       <div class="container section">
-        <h2 class="section-title">Everything you need, in one portal</h2>
-        <div class="feature-grid">
-          <article class="feature-card">
-            <div class="feature-icon">📅</div>
-            <h3>Book online</h3>
-            <p>Pick a doctor, choose a live slot and confirm — availability updates in real time.</p>
-          </article>
-          <article class="feature-card feature-card-accent">
-            <div class="feature-icon">🚨</div>
-            <h3>Emergency slot shift</h3>
-            <p>Plans changed? Move your appointment to another day or slot instantly — even swap with an open booking.</p>
-          </article>
-          <article class="feature-card">
-            <div class="feature-icon">🎛️</div>
-            <h3>Full control</h3>
-            <p>View, edit, reschedule, cancel or delete your bookings anytime from any device.</p>
-          </article>
+        <div class="section-head center" data-reveal="fade-up">
+          <span class="section-badge">✨ Next-Generation Healthcare</span>
+          <h2 class="section-title">Everything you need, engineered for ease</h2>
+          <p class="section-sub">Experience state-of-the-art online medical care with intelligent scheduling and patient-first flexibility.</p>
         </div>
 
-        <h2 class="section-title" style="margin-top:3rem">Our departments</h2>
+        <div class="feature-grid">
+          <article class="feature-card tilt" data-reveal="fade-up" style="--i:0">
+            <div class="feature-icon-badge">📅</div>
+            <h3>Real-Time Live Slot Booking</h3>
+            <p>Direct calendar integration with doctors. See verified available slots update in real time with instant reservation.</p>
+            <div class="feature-footer">
+              <span class="feature-tag">Instant confirmation</span>
+            </div>
+          </article>
+
+          <article class="feature-card feature-card-accent tilt" data-reveal="fade-up" style="--i:1">
+            <div class="feature-icon-badge emg-badge">🚨</div>
+            <h3>1-Tap Emergency Slot Shift</h3>
+            <p>Emergency came up? Shift your slot to another day or swap instantly with an open slot. Zero rescheduling penalties.</p>
+            <div class="feature-footer">
+              <span class="feature-tag accent-tag">Exclusive feature</span>
+            </div>
+          </article>
+
+          <article class="feature-card tilt" data-reveal="fade-up" style="--i:2">
+            <div class="feature-icon-badge">🤖</div>
+            <h3>Alex AI Health Assistant</h3>
+            <p>Talk or type to Alex. Ask “book me a cardiologist tomorrow” or check doctor fees and timings with voice responses.</p>
+            <div class="feature-footer">
+              <span class="feature-tag">Voice &amp; text enabled</span>
+            </div>
+          </article>
+
+          <article class="feature-card tilt" data-reveal="fade-up" style="--i:3">
+            <div class="feature-icon-badge">💳</div>
+            <h3>Transparent Fees &amp; Zero Queues</h3>
+            <p>Know exactly what you pay beforehand. Pay online securely or at the hospital desk with itemized digital receipts.</p>
+            <div class="feature-footer">
+              <span class="feature-tag">Secure checkout</span>
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <!-- SECTION: INTERACTIVE SCROLL TIMELINE (HOW IT WORKS) -->
+      <section class="timeline-section">
+        <div class="container">
+          <div class="section-head center" data-reveal="fade-up">
+            <span class="section-badge">🚀 Simple 4-Step Process</span>
+            <h2 class="section-title">How Online Booking Works</h2>
+            <p class="section-sub">From finding the right specialist to stepping into the clinic in four effortless steps.</p>
+          </div>
+
+          <div class="timeline-container">
+            <div class="timeline-line">
+              <div class="timeline-line-progress" id="timelineProgress"></div>
+            </div>
+
+            <!-- Step 1 -->
+            <div class="timeline-item" data-reveal="fade-right">
+              <div class="timeline-dot"><span class="dot-num">1</span></div>
+              <div class="timeline-content">
+                <span class="timeline-tag">Step 1</span>
+                <h3>Select Doctor &amp; Specialty</h3>
+                <p>Browse through vetted profiles with verified patient ratings, experience, department details, and consultation fees.</p>
+                <div class="timeline-preview">
+                  <span class="chip chip-ok">Cardiology</span>
+                  <span class="chip chip-info">Neurology</span>
+                  <span class="chip chip-warn">Pediatrics</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="timeline-item timeline-inverted" data-reveal="fade-left">
+              <div class="timeline-dot"><span class="dot-num">2</span></div>
+              <div class="timeline-content">
+                <span class="timeline-tag">Step 2</span>
+                <h3>Pick Date &amp; Live Available Slot</h3>
+                <p>Choose today, tomorrow or any upcoming date. Green slots are ready for immediate 1-click booking without calls.</p>
+                <div class="timeline-preview">
+                  <span class="when-pill">📅 Tomorrow</span>
+                  <span class="when-pill">⏰ 10:00 AM</span>
+                  <span class="chip chip-ok">Available</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="timeline-item" data-reveal="fade-right">
+              <div class="timeline-dot"><span class="dot-num">3</span></div>
+              <div class="timeline-content">
+                <span class="timeline-tag">Step 3</span>
+                <h3>Instant Confirmation &amp; SMS Slip</h3>
+                <p>Fill in patient details, choose pay online or at reception, and receive your digital appointment pass instantly.</p>
+                <div class="timeline-preview">
+                  <span class="chip chip-ok">✓ Instant Pass Generated</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="timeline-item timeline-inverted" data-reveal="fade-left">
+              <div class="timeline-dot"><span class="dot-num">4</span></div>
+              <div class="timeline-content">
+                <span class="timeline-tag">Step 4</span>
+                <h3>Emergency Slot Shift Flexibility</h3>
+                <p>Running late or faced an unexpected emergency? Shift your booking to any other day or swap in 1 tap.</p>
+                <div class="timeline-preview">
+                  <span class="chip chip-danger">⚡ 1-Tap Priority Shift</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION: FEATURED SPECIALISTS ON HOME -->
+      <div class="container section">
+        <div class="section-head-split" data-reveal="fade-up">
+          <div>
+            <span class="section-badge">🩺 On-Duty Specialists</span>
+            <h2 class="section-title">Meet our leading doctors</h2>
+            <p class="section-sub">Book consultations directly with experienced senior department heads.</p>
+          </div>
+          <button class="btn btn-ghost" data-nav="book">View All Doctors →</button>
+        </div>
+
+        <div class="home-doctor-grid" id="homeDoctorGrid">
+          <!-- Populated by JS with interactive cards -->
+        </div>
+      </div>
+
+      <!-- SECTION: DEPARTMENTS -->
+      <div class="container section">
+        <div class="section-head center" data-reveal="fade-up">
+          <span class="section-badge">🏥 Comprehensive Care</span>
+          <h2 class="section-title">Specialized Departments</h2>
+          <p class="section-sub">World-class medical infrastructure spanning every essential medical field.</p>
+        </div>
         <div class="dept-grid" id="deptGrid"><!-- filled by JS --></div>
+      </div>
+
+      <!-- SECTION: PATIENT TESTIMONIALS -->
+      <section class="testimonials-section">
+        <div class="container">
+          <div class="section-head center" data-reveal="fade-up">
+            <span class="section-badge">💬 Patient Feedback</span>
+            <h2 class="section-title">Real stories from our patients</h2>
+            <p class="section-sub">See how our online booking and emergency shift make hospital visits stress-free.</p>
+          </div>
+
+          <div class="testimonials-grid">
+            <article class="testi-card tilt" data-reveal="fade-up" style="--i:0">
+              <div class="testi-stars">★★★★★</div>
+              <p class="testi-quote">“The emergency slot shift feature is pure genius. My flight got delayed and I was able to shift my cardiology appointment to the next morning in under 30 seconds with zero fuss.”</p>
+              <div class="testi-author">
+                <div class="testi-avatar" style="background:#0d9488">PM</div>
+                <div>
+                  <strong>Priya Malhotra</strong>
+                  <span>Cardiology Patient · Verified</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="testi-card tilt" data-reveal="fade-up" style="--i:1">
+              <div class="testi-stars">★★★★★</div>
+              <p class="testi-quote">“Easiest hospital booking experience in India. Selected Dr. Aisha Sharma, paid the consultation fee online, received my SMS pass and walked in right on time. No counter lines!”</p>
+              <div class="testi-author">
+                <div class="testi-avatar" style="background:#0284c7">RS</div>
+                <div>
+                  <strong>Rahul Sen</strong>
+                  <span>General Medicine · Verified</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="testi-card tilt" data-reveal="fade-up" style="--i:2">
+              <div class="testi-stars">★★★★★</div>
+              <p class="testi-quote">“Alex the AI assistant helped me find the earliest pediatric slot for my daughter in seconds. The whole portal looks incredible and runs super fast on my phone.”</p>
+              <div class="testi-author">
+                <div class="testi-avatar" style="background:#8b5cf6">AV</div>
+                <div>
+                  <strong>Ananya Verma</strong>
+                  <span>Pediatrics Patient · Verified</span>
+                </div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION: INTERACTIVE FAQ ACCORDION -->
+      <div class="container section">
+        <div class="section-head center" data-reveal="fade-up">
+          <span class="section-badge">❓ Common Questions</span>
+          <h2 class="section-title">Frequently Asked Questions</h2>
+          <p class="section-sub">Everything you need to know about bookings, slot shifts, and consultations.</p>
+        </div>
+
+        <div class="faq-list">
+          <div class="faq-item" data-reveal="fade-up" style="--i:0">
+            <button class="faq-question">
+              <span>How does the 1-Tap Emergency Slot Shift work?</span>
+              <span class="faq-chevron">▾</span>
+            </button>
+            <div class="faq-answer">
+              <p>If you encounter an emergency or need to reschedule, navigate to <strong>My Bookings</strong> and click <strong>Shift Slot</strong>. You can choose any open slot across upcoming dates. If the slot is currently booked, you can optionally swap slots with the holder — both parties receive instant notification with their updated timings.</p>
+            </div>
+          </div>
+
+          <div class="faq-item" data-reveal="fade-up" style="--i:1">
+            <button class="faq-question">
+              <span>Can I book an appointment without creating an account?</span>
+              <span class="faq-chevron">▾</span>
+            </button>
+            <div class="faq-answer">
+              <p>Yes! You can book immediately using just your name and mobile number. You can later look up and manage all your appointments anytime using your phone number on the <strong>My Bookings</strong> page.</p>
+            </div>
+          </div>
+
+          <div class="faq-item" data-reveal="fade-up" style="--i:2">
+            <button class="faq-question">
+              <span>Are the consultation fees refundable upon cancellation?</span>
+              <span class="faq-chevron">▾</span>
+            </button>
+            <div class="faq-answer">
+              <p>Yes. If you cancel at least 2 hours before your appointment or shift to another date, your consultation fee is fully preserved or refunded automatically to your original payment method.</p>
+            </div>
+          </div>
+
+          <div class="faq-item" data-reveal="fade-up" style="--i:3">
+            <button class="faq-question">
+              <span>What if I have an urgent life-threatening emergency?</span>
+              <span class="faq-chevron">▾</span>
+            </button>
+            <div class="faq-answer">
+              <p>For immediate life-threatening situations, use our <strong>🚨 Emergency</strong> button to auto-assign the fastest on-duty doctor, or call our 24×7 emergency helpline directly at <strong>1800-100-200</strong>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION: EMERGENCY CALLOUT BANNER -->
+      <div class="container section">
+        <div class="emergency-cta-banner" data-reveal="zoom-in">
+          <div class="emg-banner-glow"></div>
+          <div class="emg-banner-content">
+            <span class="emg-banner-badge">🚨 Priority Triage Available</span>
+            <h2>Facing a critical health emergency?</h2>
+            <p>Our intelligent system scans all specialists across every department to lock in the earliest open slot instantly.</p>
+            <div class="emg-banner-actions">
+              <button class="btn btn-danger btn-lg btn-pulse" data-nav="emergency">⚡ Book Earliest Emergency Slot</button>
+              <a href="tel:1800100200" class="btn btn-ghost-light btn-lg">📞 Call Helpline 1800-100-200</a>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -509,6 +1264,15 @@
       <div id="payReceipt" class="pay-receipt" hidden></div>
     </div>
   </dialog>
+
+  <!-- Floating Back to Top Button with Circular Scroll Progress -->
+  <button id="backToTopBtn" class="back-to-top" aria-label="Back to top" title="Scroll to top">
+    <svg class="progress-ring" width="46" height="46" viewBox="0 0 46 46">
+      <circle class="progress-ring-bg" cx="23" cy="23" r="19" fill="none" stroke="currentColor" stroke-width="3" />
+      <circle class="progress-ring-bar" id="progressRingBar" cx="23" cy="23" r="19" fill="none" stroke="currentColor" stroke-width="3" />
+    </svg>
+    <span class="back-to-top-arrow">↑</span>
+  </button>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/app.js"></script>
