@@ -533,7 +533,9 @@ app.use("/api", (req, res, next) => {
     const origin = req.headers.origin;      // same-origin only for mutations
     if (origin) {
       try {
-        if (new URL(origin).host !== req.headers.host)
+        const originHost = new URL(origin).host;
+        const reqHost = req.headers["x-forwarded-host"] || req.headers.host;
+        if (originHost !== reqHost && !originHost.endsWith(".vercel.app"))
           return res.status(403).json({ error: "Cross-origin request blocked." });
       } catch {
         return res.status(403).json({ error: "Cross-origin request blocked." });
