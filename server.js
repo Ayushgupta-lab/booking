@@ -45,7 +45,7 @@ if (!DB_PATH) {
     DB_PATH = path.join(__dirname, "hospital.db");
   }
 }
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/paitent_booking";
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/patient_booking";
 
 
 
@@ -193,7 +193,7 @@ async function syncAllToMongo() {
     for (const a of appts) {
       await syncAppointmentToMongo(a);
     }
-    console.log("[MongoDB] Synchronized SQLite records to paitent_booking collections successfully.");
+    console.log("[MongoDB] Synchronized SQLite records to patient_booking collections successfully.");
   } catch (err) {
     console.warn("[MongoDB] Sync error:", err.message);
   }
@@ -397,21 +397,6 @@ if (apptCount === 0) {
 
 /* --------------------------------- Helpers --------------------------------- */
 /* --------------------------- Account seed + AI model ------------------------ */
-const userCount = db.prepare("SELECT COUNT(*) c FROM users").get().c;
-if (userCount === 0) {
-  const seedUsers = [
-    ["Hospital Admin", "admin@medicare.local", "1800100200", "admin123", "admin"],
-    ["Demo Patient", "demo@medicare.local", "+91 9800000000", "demo1234", "patient"],
-  ];
-  const ins = db.prepare(
-    "INSERT INTO users (name, email, phone, password_hash, salt, role) VALUES (?,?,?,?,?,?)"
-  );
-  for (const [name, email, phone, pw, role] of seedUsers) {
-    const { salt, hash } = hashPassword(pw);
-    ins.run(name, email, phone, hash, salt, role);
-  }
-}
-
 // Ensure Ayush Gupta (ayushgupta7440@gmail.com) is Admin
 const ayushEmail = "ayushgupta7440@gmail.com";
 const ayushPhone = "7489154070";
@@ -428,40 +413,43 @@ if (!ayushExisting) {
   console.log(`[Auth] Verified Admin status for Ayush Gupta (${ayushEmail})`);
 }
 
+// Remove old demo accounts if any exist
+db.prepare("DELETE FROM users WHERE email IN ('admin@medicare.local', 'demo@medicare.local')").run();
+
 // Training corpus for Alex — each phrase is linked to an intent. Matches boost
 // `hits`, so the phrases patients actually use rise to the top over time.
 const alexSeed = [
-  ["hi", "greet"], ["hello", "greet"], ["hey there", "greet"], ["namaste", "greet"], ["good morning", "greet"],
-  ["thanks", "thanks"], ["thank you so much", "thanks"], ["dhanyavaad", "thanks"], ["bye", "bye"], ["goodbye", "bye"],
+  ["hi", "greet"], ["hello", "greet"], ["hey there", "greet"], ["good morning", "greet"],
+  ["thanks", "thanks"], ["thank you so much", "thanks"], ["bye", "bye"], ["goodbye", "bye"],
   ["what can you do", "help"], ["help me", "help"], ["how does this work", "help"], ["options", "help"],
   ["book an appointment", "book"], ["i want to book a doctor", "book"], ["make an appointment", "book"],
-  ["appointment book karna hai", "book"], ["slot book karo", "book"], ["i need a consultation", "book"],
-  ["book me a cardiologist tomorrow", "book_prefill"], ["cardiologist ko book karo kal", "book_prefill"],
+  ["book a slot", "book"], ["i need a consultation", "book"],
+  ["book me a cardiologist tomorrow", "book_prefill"],
   ["show me available slots", "book"], ["i want tomorrow 10 am", "book_prefill"],
-  ["emergency booking", "emergency"], ["emergency hai", "emergency"], ["urgent appointment", "emergency"],
-  ["turant doctor chahiye", "emergency"], ["mera emergency hai", "emergency"], ["book emergency slot", "emergency"],
-  ["my bookings", "my_bookings"], ["show my appointment", "my_bookings"], ["meri booking dikhao", "my_bookings"],
+  ["emergency booking", "emergency"], ["urgent appointment", "emergency"],
+  ["need doctor immediately", "emergency"], ["i have an emergency", "emergency"], ["book emergency slot", "emergency"],
+  ["my bookings", "my_bookings"], ["show my appointment", "my_bookings"], ["show my booking", "my_bookings"],
   ["check my appointment status", "my_bookings"], ["where is my booking", "my_bookings"], ["lookup my appointment", "my_bookings"],
   ["how do i reschedule", "shift_help"], ["i need to change my slot", "shift_help"], ["shift my appointment", "shift_help"],
-  ["appointment kaise shift karun", "shift_help"], ["can i move my appointment", "shift_help"], ["reschedule my visit", "shift_help"],
-  ["how do i cancel", "cancel_help"], ["cancel my appointment", "cancel_help"], ["appointment cancel karna hai", "cancel_help"],
+  ["how to shift appointment", "shift_help"], ["can i move my appointment", "shift_help"], ["reschedule my visit", "shift_help"],
+  ["how do i cancel", "cancel_help"], ["cancel my appointment", "cancel_help"], ["i want to cancel appointment", "cancel_help"],
   ["which doctors do you have", "doctors_list"], ["list of doctors", "doctors_list"], ["show specialists", "doctors_list"],
-  ["doctors ka list", "doctors_list"], ["who is the best cardiologist", "doctors_list"],
-  ["what is the consultation fee", "fees"], ["how much does it cost", "fees"], ["fees kitna hai", "fees"],
-  ["cardiology fee", "fees"], ["price of appointment", "fees"], ["sabse sasta doctor", "cheapest"],
+  ["who is the best cardiologist", "doctors_list"],
+  ["what is the consultation fee", "fees"], ["how much does it cost", "fees"], ["what are the fees", "fees"],
+  ["cardiology fee", "fees"], ["price of appointment", "fees"],
   ["cheapest doctor", "cheapest"], ["which doctor is cheapest", "cheapest"],
   ["what are the timings", "timings"], ["when are you open", "timings"], ["clinic hours", "timings"],
-  ["office time kya hai", "timings"], ["open kab tak hai", "timings"], ["do you open on sunday", "timings"],
-  ["where is the hospital", "location"], ["address please", "location"], ["kahan situated hai", "location"],
+  ["what are the office hours", "timings"], ["how late are you open", "timings"], ["do you open on sunday", "timings"],
+  ["where is the hospital", "location"], ["address please", "location"], ["where is it located", "location"],
   ["how do i reach you", "location"], ["nearest metro", "location"],
   ["cancellation policy", "policy_cancel"], ["can i cancel for free", "policy_cancel"],
-  ["cancel charge lagega", "policy_cancel"], ["refund if i cancel", "policy_refund"], ["money back policy", "policy_refund"],
-  ["do you accept insurance", "insurance"], ["cashless claim available", "insurance"], ["insurance card chalega", "insurance"],
-  ["when do i get my reports", "reports"], ["lab report kab milega", "reports"], ["test results", "reports"],
+  ["is there a cancellation charge", "policy_cancel"], ["refund if i cancel", "policy_refund"], ["money back policy", "policy_refund"],
+  ["do you accept insurance", "insurance"], ["cashless claim available", "insurance"], ["do you accept insurance card", "insurance"],
+  ["when do i get my reports", "reports"], ["when will lab report come", "reports"], ["test results", "reports"],
   ["do you give prescriptions", "prescription"], ["can i get a prescription online", "prescription"],
-  ["how do i pay", "payment_help"], ["payment options", "payment_help"], ["card se payment ho jayega", "payment_help"],
+  ["how do i pay", "payment_help"], ["payment options", "payment_help"], ["can i pay with card", "payment_help"],
   ["can i pay online", "payment_help"], ["payment failed what to do", "payment_help"], ["upi accepted", "payment_help"],
-  ["earliest available slot", "earliest"], ["first free slot today", "earliest"], ["sabse pehla slot", "earliest"],
+  ["earliest available slot", "earliest"], ["first free slot today", "earliest"],
   ["what is the emergency number", "helpline"], ["ambulance number", "helpline"], ["emergency contact", "helpline"],
 ];
 if (db.prepare("SELECT COUNT(*) c FROM alex_examples").get().c === 0) {
@@ -552,6 +540,8 @@ app.use("/api", (req, res, next) => {
       }
     }
     if (p.startsWith("/auth/") || p.startsWith("/alex/")) return next(); // public endpoints
+    // Emergency booking is public — guests can book without an account
+    if (p === "/appointments/emergency") return next();
     if (!req.user) return res.status(401).json({ error: authHint(p), code: "auth_required" });
     if (p.startsWith("/doctors") && req.user.role !== "admin")
       return res.status(403).json({ error: "Only an admin account can manage doctors." });
@@ -718,6 +708,7 @@ app.post("/api/payments", (req, res) => {
     )
     .get(Number(appointment_id));
   if (!appt) return res.status(404).json({ error: "Appointment not found." });
+  if (!req.user) return res.status(401).json({ error: "Sign in to complete payment.", code: "auth_required" });
   if (req.user.role !== "admin" && appt.user_id != null && appt.user_id !== req.user.id)
     return res.status(403).json({ error: "That booking belongs to another patient." });
   if (appt.payment_status === "paid") return res.status(409).json({ error: "This appointment is already paid for." });

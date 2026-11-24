@@ -883,7 +883,7 @@
               <p class="hint" id="docDaysHint"></p>
             </div>
             <div class="slot-panel-right">
-              <label class="field-label">Available slots <span class="hint-inline">(green = free · grey = booked · ✖ = off duty)</span></label>
+              <label class="field-label">Available slots</label>
               <div class="slot-grid" id="slotGrid"><p class="muted">Select a doctor and date to see slots.</p></div>
             </div>
           </div>
@@ -996,7 +996,6 @@
             <h2>Admin sign-in required</h2>
             <p id="adminGateMsg">The admin panel lists every booking and manages the doctor team — it needs an admin account.</p>
             <button class="btn btn-primary" id="adminSignin">Sign in as admin</button>
-            <p class="hint">Demo admin · admin@medicare.local / admin123</p>
           </div>
         </div>
 
@@ -1212,8 +1211,6 @@
 
       <!-- PATIENT LOGIN HINT (Default: ONLY shows patient) -->
       <div class="auth-hint" id="patientAuthHint">
-        <strong>Demo accounts — one tap signs you in</strong>
-        <button type="button" class="btn-demo" data-demo="patient">👤 Demo Patient · demo@medicare.local / demo1234</button>
         <div class="auth-switch-row">
           <span>Hospital Staff or Doctor?</span>
           <button type="button" class="btn-switch-portal" id="toAdminLogin">Admin Login →</button>
@@ -1222,9 +1219,6 @@
 
       <!-- ADMIN LOGIN HINT (ONLY shown in admin login mode) -->
       <div class="auth-hint" id="adminAuthHint" hidden>
-        <strong style="color: #b45309;">🔐 Administrator Login:</strong>
-        <button type="button" class="btn-demo demo-highlight" data-demo="ayush">⭐ Ayush Gupta (Admin) · ayushgupta7440@gmail.com</button>
-        <button type="button" class="btn-demo" data-demo="admin">Hospital Admin · admin@medicare.local</button>
         <div class="auth-switch-row">
           <button type="button" class="btn-switch-portal" id="toPatientLogin">← Back to Patient Sign in</button>
         </div>
