@@ -35,7 +35,7 @@ async function api(path, options = {}, _retry = true) {
     // Sign-in wall: open the login modal, then automatically resume the same
     // request once the patient is authenticated.
     if (res.status === 401 && data.code === "auth_required" && _retry) {
-      const signedIn = await showAuth(data.error || "Please sign in to continue.");
+      const signedIn = await showAuth(data.error || "Please sign in to continue.", { tone: "info" });
       if (signedIn) return api(path, options, false);
     }
     const err = new Error(data.error || `Request failed (${res.status})`);
@@ -124,11 +124,13 @@ function renderUser() {
 
 let authMode = "patient"; // "patient" | "admin"
 let authTab = "login";      // "login" | "register"
-let loginMode = "password"; // "password" | "otp"
-let liChannel = "email";    // "email" | "sms"
+let forgotMode = false;
+let fpChannel = "email";    // "email" | "sms"
+let fpOtpSent = false;
+let fpSentTarget = "";
 let rgChannel = "email";    // "email" | "sms" | "both"
-let liOtpSent = false;
 let rgOtpSent = false;
+let rgSentKey = "";
 const otpTimers = {};
 
 function startOtpCountdown(timerEl, btnEl, seconds = 25, key = "default") {
@@ -166,6 +168,7 @@ function renderSandboxBanner(el, delivery) {
 }
 
 function authTitleText() {
+  if (forgotMode) return "Reset password";
   return authMode === "admin" ? "🔐 Admin sign-in"
     : authTab === "register" ? "Create verified account" : "Welcome back";
 }
@@ -173,40 +176,51 @@ function applyAuthHeaders() {
   $("#authTitle").textContent = authTitleText();
   const sub = $("#authSub");
   if (sub) {
-    if (authMode === "admin") sub.textContent = "Staff & administrator access — manage bookings, slots and the team.";
+    if (forgotMode) sub.textContent = "Verify your identity via Email or SMS OTP to create a new password.";
+    else if (authMode === "admin") sub.textContent = "Staff & administrator access — manage bookings, slots and the team.";
     else if (authTab === "register") sub.textContent = "Verified via Email or Phone SMS OTP for secure appointments.";
     else sub.textContent = "Sign in to book appointments, pay online and track your visits.";
   }
 }
 
-function setLoginMode(mode) {
-  loginMode = mode;
-  $$("[data-loginmode]").forEach((b) => b.classList.toggle("active", b.dataset.loginmode === mode));
-  const isOtp = mode === "otp";
-  $("#liPassWrap").hidden = isOtp;
-  $("#liOtpPanel").hidden = !isOtp;
-  $("#liEmailLabel").textContent = isOtp && liChannel === "sms" ? "Registered Phone Number" : "Registered Email or Phone";
-  $("#authSubmitBtn").textContent = isOtp ? "Verify OTP & Sign in" : "Sign in";
+function setFpChannel(ch) {
+  fpChannel = ch;
+  $$("[data-fpchannel]").forEach((b) => b.classList.toggle("active", b.dataset.fpchannel === ch));
+  fpOtpSent = false;
+  fpSentTarget = "";
+  $("#fpOtpEntryWrap").hidden = true;
+  $("#fpNewPassFields").hidden = true;
+  $("#fpOtpCode").value = "";
+  $("#fpNewPass").value = "";
+  $("#fpConfirmPass").value = "";
+  $("#fpOtpSandbox").hidden = true;
+  $("#fpSendOtpBtn").hidden = false;
 }
 
-function setLiChannel(ch) {
-  liChannel = ch;
-  $$("[data-lichannel]").forEach((b) => b.classList.toggle("active", b.dataset.lichannel === ch));
-  liOtpSent = false;
-  $("#liOtpEntryWrap").hidden = true;
-  $("#liOtpCode").value = "";
-  $("#liOtpSandbox").hidden = true;
-  $("#liSendOtpBtn").hidden = false;
-  if (loginMode === "otp") {
-    $("#liEmailLabel").textContent = ch === "sms" ? "Registered Phone Number" : "Registered Email or Phone";
-    $("#liEmail").placeholder = ch === "sms" ? "+91 9876543210" : "you@gmail.com";
+function setForgotMode(on) {
+  forgotMode = Boolean(on);
+  const tabs = $("#authTabs");
+  authNote("");
+  if (forgotMode) {
+    if (tabs) tabs.hidden = true;
+    $("#loginForm").hidden = true;
+    $("#registerForm").hidden = true;
+    $("#forgotForm").hidden = false;
+    setFpChannel("email");
+    const prefill = $("#liEmail").value.trim();
+    if (prefill) $("#fpIdentifier").value = prefill;
+    applyAuthHeaders();
+    setTimeout(() => ($("#fpIdentifier").value ? $("#fpSendOtpBtn") : $("#fpIdentifier")).focus(), 60);
+    return;
   }
+  setAuthMode(authMode);
 }
 
 function setRgChannel(ch) {
   rgChannel = ch;
   $$("[data-rgchannel]").forEach((b) => b.classList.toggle("active", b.dataset.rgchannel === ch));
   rgOtpSent = false;
+  rgSentKey = "";
   $("#rgOtpEntryWrap").hidden = true;
   $("#rgOtpSandbox").hidden = true;
   $("#rgSendOtpBtn").hidden = false;
@@ -218,24 +232,27 @@ function setRgChannel(ch) {
 
 function setAuthMode(mode) {
   authMode = mode;
+  forgotMode = false;
   const isAdm = mode === "admin";
   const tabs = $("#authTabs");
   const pHint = $("#patientAuthHint");
   const aHint = $("#adminAuthHint");
-  const m = $("#authMsg");
-  if (m) m.hidden = true;
+  const sw = $("#authSwitch");
+  authNote("");
 
+  $("#forgotForm").hidden = true;
   if (isAdm) {
     if (tabs) tabs.hidden = true;
     $("#loginForm").hidden = false;
     $("#registerForm").hidden = true;
-    setLoginMode("password");
     if (pHint) pHint.hidden = true;
     if (aHint) aHint.hidden = false;
-    $("#liEmail").placeholder = "ayushgupta7440@gmail.com";
+    if (sw) sw.hidden = true;
+    $("#liEmail").placeholder = "Admin email or phone";
     $("#liEmail").autofocus = true;
   } else {
     if (tabs) tabs.hidden = false;
+    if (sw) sw.hidden = false;
     setAuthTab("login");
     if (pHint) pHint.hidden = false;
     if (aHint) aHint.hidden = true;
@@ -246,18 +263,16 @@ function setAuthMode(mode) {
 
 let authResolver = null;
 let authCloseTimer = null;
-function showAuth(message, { force = false, mode = "patient" } = {}) {
+function showAuth(message = "", { force = false, mode = "patient", tone = "info" } = {}) {
   if (state.user && !force) return Promise.resolve(true);
   clearTimeout(authCloseTimer);
   const modal = $("#authModal");
   modal.classList.remove("closing");
-  setLoginMode("password");
-  setLiChannel("email");
   setRgChannel("email");
+  setFpChannel("email");
   setAuthMode(mode);
-  const msg = $("#authMsg");
-  msg.hidden = !message;
-  if (message) { msg.textContent = message; msg.classList.remove("ok"); }
+  if (message) authNote(message, tone);
+  else authNote("");
   if (!modal.open) modal.showModal();
   return new Promise((resolve) => { authResolver = resolve; });
 }
@@ -281,17 +296,19 @@ $("#authModal").addEventListener("close", () => {
 $("#authModal").addEventListener("cancel", (e) => { e.preventDefault(); closeAuthDrawer(); });
 $("#authClose").addEventListener("click", closeAuthDrawer);
 $("#authModal").addEventListener("click", (e) => { if (e.target === $("#authModal")) closeAuthDrawer(); });
-$("#authBtn").addEventListener("click", () =>
-  showAuth("Sign in to book appointments, pay online and manage your visits.", { mode: "patient" }));
+$("#authBtn").addEventListener("click", () => showAuth("", { mode: "patient" }));
 
 $("#toAdminLogin")?.addEventListener("click", () => setAuthMode("admin"));
 $("#toPatientLogin")?.addEventListener("click", () => setAuthMode("patient"));
-$$("[data-loginmode]").forEach((b) => b.addEventListener("click", () => setLoginMode(b.dataset.loginmode)));
-$$("[data-lichannel]").forEach((b) => b.addEventListener("click", () => setLiChannel(b.dataset.lichannel)));
+$("#toForgotPass")?.addEventListener("click", () => setForgotMode(true));
+$("#backToLoginFromForgot")?.addEventListener("click", () => setForgotMode(false));
+$$("[data-fpchannel]").forEach((b) => b.addEventListener("click", () => setFpChannel(b.dataset.fpchannel)));
 $$("[data-rgchannel]").forEach((b) => b.addEventListener("click", () => setRgChannel(b.dataset.rgchannel)));
 
 function setAuthTab(tab) {
   authTab = tab;
+  forgotMode = false;
+  $("#forgotForm").hidden = true;
   $$("[data-authtab]").forEach((t) => t.classList.toggle("active", t.dataset.authtab === tab));
   const tabs = $("#authTabs");
   if (tabs) tabs.dataset.active = tab;
@@ -302,19 +319,25 @@ function setAuthTab(tab) {
   showForm.classList.remove("enter");
   void showForm.offsetWidth;
   showForm.classList.add("enter");
-  const m = $("#authMsg");
-  if (m) m.hidden = true;
+  authNote("");
   applyAuthHeaders();
   const first = $(tab === "login" ? "#liEmail" : "#rgName");
   setTimeout(() => first?.focus(), 60);
 }
 $$("[data-authtab]").forEach((t) => t.addEventListener("click", () => { if (authMode !== "admin") setAuthTab(t.dataset.authtab); }));
 
-function authNote(text, ok = false) {
+function authNote(text, tone = "error") {
   const m = $("#authMsg");
+  if (!m) return;
+  if (!text) {
+    m.hidden = true;
+    m.className = "auth-msg";
+    return;
+  }
+  const resolved = tone === true ? "ok" : tone === false ? "error" : tone;
   m.hidden = false;
   m.textContent = text;
-  m.classList.toggle("ok", ok);
+  m.className = "auth-msg" + (resolved === "ok" ? " ok" : resolved === "info" ? " info" : "");
 }
 
 $$("[data-eye]").forEach((btn) => btn.addEventListener("click", () => {
@@ -327,15 +350,45 @@ $$("[data-eye]").forEach((btn) => btn.addEventListener("click", () => {
   input.focus();
 }));
 
-["#loginForm", "#registerForm"].forEach((sel) =>
+["#loginForm", "#registerForm", "#forgotForm"].forEach((sel) =>
   document.addEventListener("input", (e) => {
-    if (e.target.closest(sel)) { const m = $("#authMsg"); if (m && !m.classList.contains("ok")) m.hidden = true; }
+    if (e.target.closest(sel)) {
+      const m = $("#authMsg");
+      if (m && !m.classList.contains("ok") && !m.classList.contains("info")) m.hidden = true;
+    }
   }));
+
+$("#rgEmail")?.addEventListener("input", () => {
+  if (rgOtpSent && rgSentKey !== `${$("#rgEmail").value.trim()}|${$("#rgPhone").value.trim()}`) {
+    rgOtpSent = false;
+    $("#rgOtpEntryWrap").hidden = true;
+    $("#rgOtpSandbox").hidden = true;
+    $("#rgSendOtpBtn").hidden = false;
+  }
+});
+$("#rgPhone")?.addEventListener("input", () => {
+  if (rgOtpSent && rgSentKey !== `${$("#rgEmail").value.trim()}|${$("#rgPhone").value.trim()}`) {
+    rgOtpSent = false;
+    $("#rgOtpEntryWrap").hidden = true;
+    $("#rgOtpSandbox").hidden = true;
+    $("#rgSendOtpBtn").hidden = false;
+  }
+});
+$("#fpIdentifier")?.addEventListener("input", () => {
+  if (fpOtpSent && fpSentTarget !== $("#fpIdentifier").value.trim()) {
+    fpOtpSent = false;
+    $("#fpOtpEntryWrap").hidden = true;
+    $("#fpNewPassFields").hidden = true;
+    $("#fpOtpSandbox").hidden = true;
+    $("#fpSendOtpBtn").hidden = false;
+  }
+});
 
 const _authModal = $("#authModal");
 new MutationObserver(() => {
   if (!_authModal.open) return;
-  const target = $(authMode === "admin" || authTab === "login" ? "#liEmail" : "#rgName");
+  const target = forgotMode ? $("#fpIdentifier")
+    : $(authMode === "admin" || authTab === "login" ? "#liEmail" : "#rgName");
   setTimeout(() => target?.focus(), 60);
 }).observe($("#authModal"), { attributes: true, attributeFilter: ["open"] });
 
@@ -360,38 +413,46 @@ async function afterAuth() {
   refreshStats();
 }
 
-async function sendLoginOtp() {
-  const identifier = $("#liEmail").value.trim();
-  if (!identifier) { authNote("Enter your registered email or phone number first."); return; }
-  const btn = $("#liSendOtpBtn");
-  const resendBtn = $("#liResendOtpBtn");
+async function sendForgotOtp() {
+  const identifier = $("#fpIdentifier").value.trim();
+  if (!identifier) { authNote("Enter your registered email or phone number first."); return false; }
+  const btn = $("#fpSendOtpBtn");
+  const resendBtn = $("#fpResendOtpBtn");
   btn.disabled = true;
   if (resendBtn) resendBtn.disabled = true;
   btn.textContent = "Sending OTP…";
   try {
     const res = await api("/api/auth/send-otp", {
       method: "POST",
-      body: JSON.stringify({ purpose: "login", channel: liChannel, identifier }),
+      body: JSON.stringify({ purpose: "reset", channel: fpChannel, identifier }),
     });
-    liOtpSent = true;
-    $("#liOtpEntryWrap").hidden = false;
+    fpOtpSent = true;
+    fpSentTarget = identifier;
+    $("#fpOtpEntryWrap").hidden = false;
+    $("#fpNewPassFields").hidden = false;
     btn.hidden = true;
-    renderSandboxBanner($("#liOtpSandbox"), res.delivery);
-    startOtpCountdown($("#liOtpTimer"), resendBtn, 25, "login");
+    renderSandboxBanner($("#fpOtpSandbox"), res.delivery);
+    startOtpCountdown($("#fpOtpTimer"), resendBtn, 25, "reset");
     const dest = res.delivery?.email?.target || res.delivery?.sms?.target || identifier;
     const isLive = res.delivery?.email?.delivered || res.delivery?.sms?.delivered;
-    authNote(isLive ? `OTP sent to ${dest}. Enter the 6-digit code below.` : `OTP ready for ${dest}. Enter the code shown below.`, true);
-    setTimeout(() => $("#liOtpCode").focus(), 60);
+    authNote(
+      isLive ? `Reset OTP sent to ${dest}. Enter the code and choose a new password.`
+             : `Reset OTP ready for ${dest}. Enter the code below and choose a new password.`,
+      true
+    );
+    setTimeout(() => $("#fpOtpCode").focus(), 60);
+    return true;
   } catch (err) {
     authNote(err.message);
+    return false;
   } finally {
     btn.disabled = false;
-    btn.textContent = "Send Login OTP";
+    btn.textContent = "Send Reset OTP";
   }
 }
 
-$("#liSendOtpBtn")?.addEventListener("click", sendLoginOtp);
-$("#liResendOtpBtn")?.addEventListener("click", sendLoginOtp);
+$("#fpSendOtpBtn")?.addEventListener("click", sendForgotOtp);
+$("#fpResendOtpBtn")?.addEventListener("click", sendForgotOtp);
 
 async function sendRegisterOtp() {
   const name = $("#rgName").value.trim();
@@ -414,6 +475,7 @@ async function sendRegisterOtp() {
       body: JSON.stringify({ purpose: "register", channel: rgChannel, email, phone }),
     });
     rgOtpSent = true;
+    rgSentKey = `${email}|${phone}`;
     $("#rgOtpEntryWrap").hidden = false;
     btn.hidden = true;
     $("#rgEmailOtpField").hidden = rgChannel === "sms";
@@ -443,46 +505,64 @@ $("#rgResendOtpBtn")?.addEventListener("click", sendRegisterOtp);
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const identifier = $("#liEmail").value.trim();
-  if (!identifier) { authNote("Enter your email or phone number."); return; }
+  const password = $("#liPass").value;
+  if (!identifier) { authNote("Enter your registered email or phone number."); return; }
+  if (!password) { authNote("Enter your password to sign in."); return; }
 
   const btn = $("#authSubmitBtn");
   const label = btn.textContent;
   btn.disabled = true;
+  btn.textContent = "Signing in…";
 
   try {
-    let res;
-    if (loginMode === "otp") {
-      if (!liOtpSent) {
-        btn.disabled = false;
-        await sendLoginOtp();
-        return;
-      }
-      const code = $("#liOtpCode").value.trim();
-      if (!/^\d{6}$/.test(code)) {
-        authNote("Enter the 6-digit OTP code.");
-        return;
-      }
-      btn.textContent = "Verifying…";
-      res = await api("/api/auth/login-otp", {
-        method: "POST",
-        body: JSON.stringify({ channel: liChannel, identifier, otp: code }),
-      });
-    } else {
-      const password = $("#liPass").value;
-      if (!password) { authNote("Enter your password to sign in."); return; }
-      btn.textContent = "Signing in…";
-      res = await api("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ identifier, password }),
-      });
-    }
-
+    const res = await api("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ identifier, password }),
+    });
     if (res.token) localStorage.setItem("medicare_token", res.token);
     state.user = res.user;
     authNote(`Welcome back, ${res.user.name}!`, true);
     await afterAuth();
     toast(`👋 Signed in as ${res.user.name} (${res.user.role})`, "success");
     setTimeout(() => finishAuth(true), 300);
+  } catch (err) {
+    authNote(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+});
+
+$("#forgotForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!fpOtpSent) {
+    await sendForgotOtp();
+    return;
+  }
+  const identifier = $("#fpIdentifier").value.trim();
+  const code = $("#fpOtpCode").value.trim();
+  const newPass = $("#fpNewPass").value;
+  const confirmPass = $("#fpConfirmPass").value;
+
+  if (!/^\d{6}$/.test(code)) { authNote("Enter the 6-digit reset OTP."); return; }
+  if (!newPass || newPass.length < 6) { authNote("New password must be at least 6 characters."); return; }
+  if (newPass !== confirmPass) { authNote("Passwords do not match. Re-enter both fields."); return; }
+
+  const btn = $("#fpSubmitBtn");
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "Resetting password…";
+  try {
+    const res = await api("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ channel: fpChannel, identifier, otp: code, new_password: newPass }),
+    });
+    setForgotMode(false);
+    $("#liEmail").value = res.email || identifier;
+    $("#liPass").value = "";
+    authNote("Password updated! Sign in with your new password.", true);
+    toast("✅ Password updated! Sign in now.", "success");
+    setTimeout(() => $("#liPass").focus(), 80);
   } catch (err) {
     authNote(err.message);
   } finally {
@@ -1095,7 +1175,7 @@ async function showAllMine() {
 }
 
 document.addEventListener("click", (e) => {
-  if (e.target.closest("[data-signin]")) showAuth("Sign in to see your bookings.");
+  if (e.target.closest("[data-signin]")) showAuth("", { mode: "patient" });
 });
 
 /* ---------------------------- shared card actions ----------------------------- */
@@ -1239,11 +1319,10 @@ function hideAdminGate() {
   $("#adminGate").hidden = true;
 }
 $("#adminSignin").addEventListener("click", async () => {
-  const note = state.user ? `You're signed in as ${state.user.name}. Use the admin account below to open the panel.`
-    : "Enter the admin account to open the panel.";
-  const ok = await showAuth(note, { force: true, mode: "admin" });
+  const note = state.user ? `You're signed in as ${state.user.name}. Sign in with an admin account below.` : "";
+  const ok = await showAuth(note, { force: true, mode: "admin", tone: "info" });
   if (ok && state.user?.role !== "admin")
-    showAdminGate("That account does not have administrator privileges. Sign in with your admin email (ayushgupta7440@gmail.com).");
+    showAdminGate("That account does not have administrator privileges. Sign in with an admin account.");
   else loadAdmin();
 });
 

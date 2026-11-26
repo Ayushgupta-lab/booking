@@ -234,7 +234,7 @@ app.post(
   "/api/auth/send-otp",
   ah(async (req, res) => {
     const { purpose = "register", channel = "email", email, phone, identifier } = req.body || {};
-    if (!["register", "login", "lookup"].includes(purpose)) {
+    if (!["register", "reset", "lookup"].includes(purpose)) {
       return res.status(400).json({ error: "Invalid OTP purpose." });
     }
     if (!["email", "sms", "both"].includes(channel)) {
@@ -261,7 +261,7 @@ app.post(
       if (existingByPhone) {
         return res.status(409).json({ error: "An account with this phone number already exists — please sign in." });
       }
-    } else if (purpose === "login") {
+    } else if (purpose === "reset") {
       const rawId = identifier || (channel === "sms" ? phone : email);
       const user = await db.findUserByIdentifier(rawId);
       if (!user) {
@@ -434,10 +434,20 @@ app.post(
 );
 
 app.post(
-  "/api/auth/login-otp",
+  "/api/auth/reset-password",
   ah(async (req, res) => {
-    const { channel = "email", identifier, email, phone, otp: code } = req.body || {};
-    const rawId = identifier || (channel === "sms" ? phone : email);
+    const { channel = "email", identifier, email, phone, otp: code, new_password } = req.body || {};
+    const rawId = String(identifier || (channel === "sms" ? phone : email) || "").trim();
+    if (!rawId) {
+      return res.status(400).json({ error: "Enter your registered email or phone number." });
+    }
+    if (!["email", "sms"].includes(channel)) {
+      return res.status(400).json({ error: "Invalid verification channel." });
+    }
+    if (!new_password || String(new_password).length < 6) {
+      return res.status(400).json({ error: "New password must be at least 6 characters." });
+    }
+
     const row = await db.findUserByIdentifier(rawId);
     if (!row) {
       return res.status(404).json({ error: "No registered account found for that email or phone." });
@@ -446,17 +456,21 @@ app.post(
     let check;
     if (channel === "sms") {
       const p = otp.normalizePhoneNumber(row.phone);
-      if (!p.ok) return res.status(400).json({ error: "Account has no valid phone number." });
-      check = await verifyStoredOtp("login", "sms", p.phone, code);
+      if (!p.ok) return res.status(400).json({ error: "Account has no valid phone number linked." });
+      check = await verifyStoredOtp("reset", "sms", p.phone, code);
     } else {
-      check = await verifyStoredOtp("login", "email", row.email, code);
+      check = await verifyStoredOtp("reset", "email", row.email, code);
     }
     if (!check.ok) return res.status(check.status).json({ error: check.error });
 
-    const user = db.cleanUser(row);
-    const { token, ttlMs } = await db.createSession(user.id);
-    setSessionCookie(req, res, token, ttlMs);
-    res.json({ ok: true, token, user });
+    await db.updateUserPassword(row.id, String(new_password));
+    await db.deleteUserSessions(row.id);
+
+    res.json({
+      ok: true,
+      email: row.email,
+      message: "Password reset successfully. Please sign in with your new password.",
+    });
   })
 );
 

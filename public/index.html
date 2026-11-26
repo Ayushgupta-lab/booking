@@ -1194,42 +1194,66 @@
       <p class="auth-msg" id="authMsg" role="status" aria-live="polite" hidden></p>
 
       <form id="loginForm" class="auth-form" novalidate>
-        <div class="otp-mode-switch" role="group" aria-label="Sign in method">
-          <button type="button" class="otp-mode-btn active" data-loginmode="password">🔑 Password</button>
-          <button type="button" class="otp-mode-btn" data-loginmode="otp">📲 Email / SMS OTP</button>
-        </div>
-
         <div class="field"><label for="liEmail" id="liEmailLabel">Email or Phone</label>
           <input id="liEmail" type="text" class="input" required placeholder="you@gmail.com or +91 9876543210" autocomplete="username" /></div>
 
-        <div class="field" id="liPassWrap"><label for="liPass">Password</label>
+        <div class="field" id="liPassWrap">
+          <div class="field-head-row">
+            <label for="liPass">Password</label>
+            <button type="button" class="link-btn forgot-link" id="toForgotPass">Forgot password?</button>
+          </div>
           <div class="pass-wrap">
             <input id="liPass" type="password" class="input" required placeholder="••••••••" autocomplete="current-password" />
             <button type="button" class="eye-btn" data-eye="liPass" aria-label="Show password">Show</button>
-          </div></div>
-
-        <div id="liOtpPanel" class="otp-box" hidden>
-          <div class="otp-channel-row">
-            <span class="otp-ch-lbl">Send OTP via:</span>
-            <button type="button" class="otp-ch-btn active" data-lichannel="email">📧 Email</button>
-            <button type="button" class="otp-ch-btn" data-lichannel="sms">📱 Phone SMS</button>
           </div>
-          <div id="liOtpEntryWrap" hidden>
-            <div class="otp-box-head">
-              <strong>Enter 6-digit OTP</strong>
-              <span class="otp-timer" id="liOtpTimer"></span>
-            </div>
-            <div id="liOtpSandbox" class="otp-sandbox" hidden></div>
-            <div class="otp-row">
-              <input id="liOtpCode" class="input otp-input" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code" />
-              <button type="button" class="btn btn-ghost btn-sm" id="liResendOtpBtn">Resend</button>
-            </div>
-          </div>
-          <button type="button" class="btn btn-ghost btn-sm" id="liSendOtpBtn" style="width:100%">Send Login OTP</button>
         </div>
 
         <button class="btn btn-primary btn-lg" type="submit" id="authSubmitBtn">Sign in</button>
         <p class="hint auth-switch" id="authSwitch">New to MediCare? <button type="button" class="link-btn" data-authtab="register">Create an account</button></p>
+      </form>
+
+      <form id="forgotForm" class="auth-form" hidden novalidate>
+        <p class="hint">Enter your registered email or mobile number. Verify with a 6-digit OTP to set a new password.</p>
+        <div class="field"><label for="fpIdentifier">Registered Email or Phone *</label>
+          <input id="fpIdentifier" type="text" class="input" required placeholder="you@gmail.com or +91 9876543210" autocomplete="username" /></div>
+
+        <div class="otp-box" id="fpOtpPanel">
+          <div class="otp-channel-row">
+            <span class="otp-ch-lbl">Send OTP via:</span>
+            <button type="button" class="otp-ch-btn active" data-fpchannel="email">📧 Email OTP</button>
+            <button type="button" class="otp-ch-btn" data-fpchannel="sms">📱 SMS OTP</button>
+          </div>
+          <div id="fpOtpEntryWrap" class="otp-entry-wrap" hidden>
+            <div class="otp-box-head">
+              <strong>Enter 6-digit Reset OTP</strong>
+              <span class="otp-timer" id="fpOtpTimer"></span>
+            </div>
+            <div id="fpOtpSandbox" class="otp-sandbox" hidden></div>
+            <div class="otp-row">
+              <input id="fpOtpCode" class="input otp-input" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code" />
+              <button type="button" class="btn btn-ghost btn-sm" id="fpResendOtpBtn">Resend</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" id="fpSendOtpBtn" style="width:100%">Send Reset OTP</button>
+        </div>
+
+        <div id="fpNewPassFields" class="fp-pass-fields" hidden>
+          <div class="field"><label for="fpNewPass">New password *</label>
+            <div class="pass-wrap">
+              <input id="fpNewPass" type="password" class="input" required minlength="6" placeholder="At least 6 characters" autocomplete="new-password" />
+              <button type="button" class="eye-btn" data-eye="fpNewPass" aria-label="Show password">Show</button>
+            </div>
+          </div>
+          <div class="field"><label for="fpConfirmPass">Confirm new password *</label>
+            <div class="pass-wrap">
+              <input id="fpConfirmPass" type="password" class="input" required minlength="6" placeholder="Re-enter new password" autocomplete="new-password" />
+              <button type="button" class="eye-btn" data-eye="fpConfirmPass" aria-label="Show password">Show</button>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-lg" type="submit" id="fpSubmitBtn">Verify OTP &amp; Reset Password</button>
+        </div>
+
+        <p class="hint auth-switch">Remembered your password? <button type="button" class="link-btn" id="backToLoginFromForgot">← Back to Sign in</button></p>
       </form>
 
       <form id="registerForm" class="auth-form" hidden novalidate>

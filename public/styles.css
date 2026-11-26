@@ -472,8 +472,14 @@ dialog.auth-modal.closing .auth-shell { animation: authPopOut 0.26s ease forward
 .auth-tab { flex: 1; border: none; background: none; font: inherit; font-weight: 700; font-size: 0.86rem; color: var(--muted); padding: 0.5rem; border-radius: 999px; cursor: pointer; transition: 0.15s; }
 .auth-tab.active { background: #fff; color: var(--teal-700); box-shadow: var(--shadow-sm); }
 .auth-form { display: grid; gap: 0.9rem; }
-.auth-msg { font-size: 0.84rem; font-weight: 600; border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; margin-bottom: 0.9rem; background: var(--danger-50); color: #9f1239; border: 1px solid #fecdd3; }
+.auth-msg { font-size: 0.84rem; font-weight: 600; border-radius: var(--radius-sm); padding: 0.6rem 0.8rem; margin-bottom: 0.25rem; background: var(--danger-50); color: #9f1239; border: 1px solid #fecdd3; }
 .auth-msg.ok { background: var(--ok-50, #ecfdf5); color: #065f46; border: 1px solid #a7f3d0; }
+.auth-msg.info { background: #f0fdfa; color: #0f766e; border: 1px solid #99f6e4; }
+.field-head-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.35rem; }
+.field-head-row label { margin-bottom: 0 !important; }
+.forgot-link { font-size: 0.78rem; font-weight: 700; color: var(--teal-700); }
+.fp-pass-fields { display: grid; gap: 0.9rem; }
+.fp-pass-fields[hidden], .otp-entry-wrap[hidden] { display: none; }
 .auth-hint { margin-top: 1.2rem; border-top: 1px dashed var(--line); padding-top: 0.9rem; display: grid; gap: 0.4rem; font-size: 0.78rem; color: var(--muted); }
 .auth-hint strong { color: var(--navy); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; }
 .btn-demo { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.45rem 0.65rem; text-align: left; font-size: 0.78rem; font-family: inherit; color: var(--navy); cursor: pointer; transition: all 0.15s ease; width: 100%; display: flex; align-items: center; gap: 0.35rem; }
