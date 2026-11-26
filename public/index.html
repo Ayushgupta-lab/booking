@@ -978,6 +978,20 @@
           </div>
         </div>
 
+        <div id="myLookupOtpBox" class="otp-box inline-otp" hidden>
+          <div class="otp-box-head">
+            <strong id="myLookupOtpTitle">📱 Verify Phone Number via SMS OTP</strong>
+            <span class="otp-timer" id="myLookupTimer"></span>
+          </div>
+          <p class="hint" id="myLookupOtpNote"></p>
+          <div id="myLookupSandbox" class="otp-sandbox" hidden></div>
+          <div class="otp-row">
+            <input id="myLookupOtpInput" class="input otp-input" inputmode="numeric" maxlength="6" placeholder="Enter 6-digit OTP" />
+            <button type="button" class="btn btn-primary" id="myLookupVerifyBtn">Verify &amp; View</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="myLookupResendBtn">Resend</button>
+          </div>
+        </div>
+
         <div id="myList" class="appt-list"><p class="muted">Search with your phone number to see your appointments.</p></div>
       </div>
     </section>
@@ -1181,31 +1195,85 @@
       <p class="auth-msg" id="authMsg" role="status" aria-live="polite" hidden></p>
 
       <form id="loginForm" class="auth-form" novalidate>
-        <div class="field"><label for="liEmail">Email</label>
-          <input id="liEmail" type="email" class="input" required placeholder="you@example.com" autocomplete="email" /></div>
-        <div class="field"><label for="liPass">Password</label>
+        <div class="otp-mode-switch" role="group" aria-label="Sign in method">
+          <button type="button" class="otp-mode-btn active" data-loginmode="password">🔑 Password</button>
+          <button type="button" class="otp-mode-btn" data-loginmode="otp">📲 Email / SMS OTP</button>
+        </div>
+
+        <div class="field"><label for="liEmail" id="liEmailLabel">Email or Phone</label>
+          <input id="liEmail" type="text" class="input" required placeholder="you@gmail.com or +91 9876543210" autocomplete="username" /></div>
+
+        <div class="field" id="liPassWrap"><label for="liPass">Password</label>
           <div class="pass-wrap">
             <input id="liPass" type="password" class="input" required placeholder="••••••••" autocomplete="current-password" />
             <button type="button" class="eye-btn" data-eye="liPass" aria-label="Show password">Show</button>
           </div></div>
+
+        <div id="liOtpPanel" class="otp-box" hidden>
+          <div class="otp-channel-row">
+            <span class="otp-ch-lbl">Send OTP via:</span>
+            <button type="button" class="otp-ch-btn active" data-lichannel="email">📧 Email</button>
+            <button type="button" class="otp-ch-btn" data-lichannel="sms">📱 Phone SMS</button>
+          </div>
+          <div id="liOtpEntryWrap" hidden>
+            <div class="otp-box-head">
+              <strong>Enter 6-digit OTP</strong>
+              <span class="otp-timer" id="liOtpTimer"></span>
+            </div>
+            <div id="liOtpSandbox" class="otp-sandbox" hidden></div>
+            <div class="otp-row">
+              <input id="liOtpCode" class="input otp-input" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code" />
+              <button type="button" class="btn btn-ghost btn-sm" id="liResendOtpBtn">Resend</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="liSendOtpBtn" style="width:100%">Send Login OTP</button>
+        </div>
+
         <button class="btn btn-primary btn-lg" type="submit" id="authSubmitBtn">Sign in</button>
         <p class="hint auth-switch" id="authSwitch">New to MediCare? <button type="button" class="link-btn" data-authtab="register">Create an account</button></p>
       </form>
 
       <form id="registerForm" class="auth-form" hidden novalidate>
-        <div class="field"><label for="rgName">Full name</label>
+        <div class="field"><label for="rgName">Full name *</label>
           <input id="rgName" class="input" required placeholder="e.g. Aarav Patel" autocomplete="name" /></div>
-        <div class="field"><label for="rgEmail">Email</label>
-          <input id="rgEmail" type="email" class="input" required placeholder="you@example.com" autocomplete="email" /></div>
-        <div class="field"><label for="rgPhone">Phone (optional)</label>
-          <input id="rgPhone" class="input" placeholder="+91 98123 45678" autocomplete="tel" /></div>
-        <div class="field"><label for="rgPass">Password</label>
+        <div class="field"><label for="rgEmail">Email *</label>
+          <input id="rgEmail" type="email" class="input" required placeholder="you@gmail.com" autocomplete="email" /></div>
+        <div class="field"><label for="rgPhone">Phone number *</label>
+          <input id="rgPhone" type="tel" class="input" required placeholder="e.g. +91 9876543210" autocomplete="tel" /></div>
+        <div class="field"><label for="rgPass">Password *</label>
           <div class="pass-wrap">
             <input id="rgPass" type="password" class="input" required minlength="6" placeholder="At least 6 characters" autocomplete="new-password" />
             <button type="button" class="eye-btn" data-eye="rgPass" aria-label="Show password">Show</button>
           </div>
           <p class="hint" id="rgHint">Minimum 6 characters.</p></div>
-        <button class="btn btn-primary btn-lg" type="submit">Create account</button>
+
+        <div class="otp-box" id="rgOtpPanel">
+          <div class="otp-channel-row">
+            <span class="otp-ch-lbl">Verify via:</span>
+            <button type="button" class="otp-ch-btn active" data-rgchannel="email">📧 Email OTP</button>
+            <button type="button" class="otp-ch-btn" data-rgchannel="sms">📱 SMS OTP</button>
+            <button type="button" class="otp-ch-btn" data-rgchannel="both">📧+📱 Both</button>
+          </div>
+          <div id="rgOtpEntryWrap" hidden>
+            <div class="otp-box-head">
+              <strong>Enter Verification OTP</strong>
+              <span class="otp-timer" id="rgOtpTimer"></span>
+            </div>
+            <div id="rgOtpSandbox" class="otp-sandbox" hidden></div>
+            <div id="rgEmailOtpField" class="field" style="margin-bottom:0.45rem">
+              <label for="rgEmailOtp">Email 6-digit OTP</label>
+              <input id="rgEmailOtp" class="input otp-input" inputmode="numeric" maxlength="6" placeholder="6-digit Email OTP" autocomplete="one-time-code" />
+            </div>
+            <div id="rgSmsOtpField" class="field" hidden style="margin-bottom:0.45rem">
+              <label for="rgSmsOtp">Phone SMS 6-digit OTP</label>
+              <input id="rgSmsOtp" class="input otp-input" inputmode="numeric" maxlength="6" placeholder="6-digit SMS OTP" autocomplete="one-time-code" />
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" id="rgResendOtpBtn">↻ Resend OTP</button>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="rgSendOtpBtn" style="width:100%">Send Verification OTP</button>
+        </div>
+
+        <button class="btn btn-primary btn-lg" type="submit" id="rgSubmitBtn">Verify &amp; Create account</button>
         <p class="hint auth-switch" id="authSwitch2">Already have an account? <button type="button" class="link-btn" data-authtab="login">Sign in</button></p>
       </form>
 

@@ -1,0 +1,10 @@
+node_modules
+screenshots
+hospital.db
+hospital.db-shm
+hospital.db-wal
+.env
+.env.local
+*.log
+backups
+.git

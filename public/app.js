@@ -6,12 +6,14 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 const state = {
   doctors: [],
+  allDoctors: [],
   selectedDoctor: null,
   selectedDate: null,
   selectedSlot: null,
   editingId: null,
   shiftingId: null,
   myPhone: "",
+  lookupToken: sessionStorage.getItem("medicare_lookup_token") || "",
   user: null,
   checkout: null,
 };
@@ -21,6 +23,7 @@ async function api(path, options = {}, _retry = true) {
   const token = localStorage.getItem("medicare_token");
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (state.lookupToken) headers["X-Lookup-Token"] = state.lookupToken;
 
   const res = await fetch(path, {
     credentials: "include",
@@ -35,7 +38,10 @@ async function api(path, options = {}, _retry = true) {
       const signedIn = await showAuth(data.error || "Please sign in to continue.");
       if (signedIn) return api(path, options, false);
     }
-    throw new Error(data.error || `Request failed (${res.status})`);
+    const err = new Error(data.error || `Request failed (${res.status})`);
+    err.status = res.status;
+    err.code = data.code || null;
+    throw err;
   }
   return data;
 }
@@ -64,7 +70,10 @@ function fmtDate(d) {
 const isoOf = (offset) => {
   const d = new Date();
   d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 };
 
 const AVATAR_COLORS = ["#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0891b2", "#4f46e5", "#059669"];
@@ -115,19 +124,96 @@ function renderUser() {
 
 let authMode = "patient"; // "patient" | "admin"
 let authTab = "login";      // "login" | "register"
+let loginMode = "password"; // "password" | "otp"
+let liChannel = "email";    // "email" | "sms"
+let rgChannel = "email";    // "email" | "sms" | "both"
+let liOtpSent = false;
+let rgOtpSent = false;
+const otpTimers = {};
+
+function startOtpCountdown(timerEl, btnEl, seconds = 25, key = "default") {
+  clearInterval(otpTimers[key]);
+  let left = seconds;
+  if (btnEl) btnEl.disabled = true;
+  const tick = () => {
+    if (timerEl) timerEl.textContent = left > 0 ? `Resend in ${left}s` : "OTP expires in 5m";
+    if (left <= 0) {
+      clearInterval(otpTimers[key]);
+      if (btnEl) btnEl.disabled = false;
+    }
+    left -= 1;
+  };
+  tick();
+  otpTimers[key] = setInterval(tick, 1000);
+}
+
+function renderSandboxBanner(el, delivery) {
+  if (!el) return;
+  const msgs = [];
+  if (delivery?.email?.mode === "sandbox" && delivery.email.sandboxOtp) {
+    msgs.push(`Email OTP (Sandbox mode — configure GMAIL_USER for live email): <strong>${esc(delivery.email.sandboxOtp)}</strong>`);
+  }
+  if (delivery?.sms?.mode === "sandbox" && delivery.sms.sandboxOtp) {
+    msgs.push(`SMS OTP (Sandbox mode — configure FAST2SMS_API_KEY / TWILIO for live SMS): <strong>${esc(delivery.sms.sandboxOtp)}</strong>`);
+  }
+  if (msgs.length) {
+    el.innerHTML = msgs.join("<br />");
+    el.hidden = false;
+  } else {
+    el.hidden = true;
+    el.innerHTML = "";
+  }
+}
 
 function authTitleText() {
   return authMode === "admin" ? "🔐 Admin sign-in"
-    : authTab === "register" ? "Create your account" : "Welcome back";
+    : authTab === "register" ? "Create verified account" : "Welcome back";
 }
 function applyAuthHeaders() {
   $("#authTitle").textContent = authTitleText();
   const sub = $("#authSub");
   if (sub) {
-    if (authMode === "admin") sub.textContent = "Staff & doctor access — manage bookings, slots and the team.";
-    else if (authTab === "register") sub.textContent = "One account for faster booking, payments and your visit history.";
+    if (authMode === "admin") sub.textContent = "Staff & administrator access — manage bookings, slots and the team.";
+    else if (authTab === "register") sub.textContent = "Verified via Email or Phone SMS OTP for secure appointments.";
     else sub.textContent = "Sign in to book appointments, pay online and track your visits.";
   }
+}
+
+function setLoginMode(mode) {
+  loginMode = mode;
+  $$("[data-loginmode]").forEach((b) => b.classList.toggle("active", b.dataset.loginmode === mode));
+  const isOtp = mode === "otp";
+  $("#liPassWrap").hidden = isOtp;
+  $("#liOtpPanel").hidden = !isOtp;
+  $("#liEmailLabel").textContent = isOtp && liChannel === "sms" ? "Registered Phone Number" : "Registered Email or Phone";
+  $("#authSubmitBtn").textContent = isOtp ? "Verify OTP & Sign in" : "Sign in";
+}
+
+function setLiChannel(ch) {
+  liChannel = ch;
+  $$("[data-lichannel]").forEach((b) => b.classList.toggle("active", b.dataset.lichannel === ch));
+  liOtpSent = false;
+  $("#liOtpEntryWrap").hidden = true;
+  $("#liOtpCode").value = "";
+  $("#liOtpSandbox").hidden = true;
+  $("#liSendOtpBtn").hidden = false;
+  if (loginMode === "otp") {
+    $("#liEmailLabel").textContent = ch === "sms" ? "Registered Phone Number" : "Registered Email or Phone";
+    $("#liEmail").placeholder = ch === "sms" ? "+91 9876543210" : "you@gmail.com";
+  }
+}
+
+function setRgChannel(ch) {
+  rgChannel = ch;
+  $$("[data-rgchannel]").forEach((b) => b.classList.toggle("active", b.dataset.rgchannel === ch));
+  rgOtpSent = false;
+  $("#rgOtpEntryWrap").hidden = true;
+  $("#rgOtpSandbox").hidden = true;
+  $("#rgSendOtpBtn").hidden = false;
+  $("#rgEmailOtp").value = "";
+  $("#rgSmsOtp").value = "";
+  $("#rgEmailOtpField").hidden = ch === "sms";
+  $("#rgSmsOtpField").hidden = ch === "email";
 }
 
 function setAuthMode(mode) {
@@ -143,36 +229,44 @@ function setAuthMode(mode) {
     if (tabs) tabs.hidden = true;
     $("#loginForm").hidden = false;
     $("#registerForm").hidden = true;
+    setLoginMode("password");
     if (pHint) pHint.hidden = true;
     if (aHint) aHint.hidden = false;
-    $("#liEmail").placeholder = "admin@medicare.local";
+    $("#liEmail").placeholder = "ayushgupta7440@gmail.com";
     $("#liEmail").autofocus = true;
   } else {
     if (tabs) tabs.hidden = false;
     setAuthTab("login");
     if (pHint) pHint.hidden = false;
     if (aHint) aHint.hidden = true;
-    $("#liEmail").placeholder = "you@example.com";
+    $("#liEmail").placeholder = "you@gmail.com or +91 9876543210";
   }
   applyAuthHeaders();
 }
 
 let authResolver = null;
+let authCloseTimer = null;
 function showAuth(message, { force = false, mode = "patient" } = {}) {
   if (state.user && !force) return Promise.resolve(true);
+  clearTimeout(authCloseTimer);
+  const modal = $("#authModal");
+  modal.classList.remove("closing");
+  setLoginMode("password");
+  setLiChannel("email");
+  setRgChannel("email");
   setAuthMode(mode);
   const msg = $("#authMsg");
   msg.hidden = !message;
   if (message) { msg.textContent = message; msg.classList.remove("ok"); }
-  const modal = $("#authModal");
   if (!modal.open) modal.showModal();
   return new Promise((resolve) => { authResolver = resolve; });
 }
 function closeAuthDrawer() {
   const m = $("#authModal");
   if (!m.open || m.classList.contains("closing")) return;
-  m.classList.add("closing");           // slide-out animation (drawerOut)
-  setTimeout(() => { m.classList.remove("closing"); m.close(); }, 280);
+  m.classList.add("closing");
+  clearTimeout(authCloseTimer);
+  authCloseTimer = setTimeout(() => { m.classList.remove("closing"); m.close(); }, 280);
 }
 function finishAuth(ok) {
   closeAuthDrawer();
@@ -184,28 +278,29 @@ $("#authModal").addEventListener("close", () => {
   const r = authResolver; authResolver = null;
   r?.(!!state.user);
 });
-// Escape → animate out instead of snapping shut
 $("#authModal").addEventListener("cancel", (e) => { e.preventDefault(); closeAuthDrawer(); });
 $("#authClose").addEventListener("click", closeAuthDrawer);
-// Click on the dimmed backdrop (dialog box itself) also closes
 $("#authModal").addEventListener("click", (e) => { if (e.target === $("#authModal")) closeAuthDrawer(); });
 $("#authBtn").addEventListener("click", () =>
   showAuth("Sign in to book appointments, pay online and manage your visits.", { mode: "patient" }));
 
 $("#toAdminLogin")?.addEventListener("click", () => setAuthMode("admin"));
 $("#toPatientLogin")?.addEventListener("click", () => setAuthMode("patient"));
+$$("[data-loginmode]").forEach((b) => b.addEventListener("click", () => setLoginMode(b.dataset.loginmode)));
+$$("[data-lichannel]").forEach((b) => b.addEventListener("click", () => setLiChannel(b.dataset.lichannel)));
+$$("[data-rgchannel]").forEach((b) => b.addEventListener("click", () => setRgChannel(b.dataset.rgchannel)));
 
 function setAuthTab(tab) {
   authTab = tab;
   $$("[data-authtab]").forEach((t) => t.classList.toggle("active", t.dataset.authtab === tab));
   const tabs = $("#authTabs");
-  if (tabs) tabs.dataset.active = tab;   // slides the white pill under the active tab
+  if (tabs) tabs.dataset.active = tab;
   const showForm = tab === "login" ? $("#loginForm") : $("#registerForm");
   const hideForm = tab === "login" ? $("#registerForm") : $("#loginForm");
   hideForm.hidden = true;
   showForm.hidden = false;
   showForm.classList.remove("enter");
-  void showForm.offsetWidth;      // restart the entrance animation
+  void showForm.offsetWidth;
   showForm.classList.add("enter");
   const m = $("#authMsg");
   if (m) m.hidden = true;
@@ -222,7 +317,6 @@ function authNote(text, ok = false) {
   m.classList.toggle("ok", ok);
 }
 
-// Show/hide password toggles
 $$("[data-eye]").forEach((btn) => btn.addEventListener("click", () => {
   const input = document.getElementById(btn.dataset.eye);
   if (!input) return;
@@ -233,37 +327,17 @@ $$("[data-eye]").forEach((btn) => btn.addEventListener("click", () => {
   input.focus();
 }));
 
-// Clear the error banner as soon as the user edits the form again
 ["#loginForm", "#registerForm"].forEach((sel) =>
   document.addEventListener("input", (e) => {
     if (e.target.closest(sel)) { const m = $("#authMsg"); if (m && !m.classList.contains("ok")) m.hidden = true; }
   }));
 
-// Focus the first field whenever the modal opens
-$("#authModal").addEventListener("toggle", () => {});
 const _authModal = $("#authModal");
 new MutationObserver(() => {
   if (!_authModal.open) return;
   const target = $(authMode === "admin" || authTab === "login" ? "#liEmail" : "#rgName");
   setTimeout(() => target?.focus(), 60);
 }).observe($("#authModal"), { attributes: true, attributeFilter: ["open"] });
-
-// One-tap demo credentials: fill and submit immediately
-function submitLogin() { $("#loginForm").requestSubmit(); }
-function fillDemo(kind) {
-  setAuthTab("login");
-  const map = {
-    ayush:  ["ayushgupta7440@gmail.com", "admin123"],
-    admin:  ["admin@medicare.local", "admin123"],
-    patient:["demo@medicare.local", "demo1234"],
-  };
-  const pair = map[kind];
-  if (!pair) return;
-  $("#liEmail").value = pair[0];
-  $("#liPass").value = pair[1];
-  authNote("Signed you in with the demo account…", true);
-  submitLogin();
-}
 
 function refreshMyView() {
   if (state.myPhone) loadMyBookings();
@@ -276,46 +350,157 @@ async function afterAuth() {
   if (state.user) {
     if (!$("#pName").value) $("#pName").value = state.user.name;
     if (!$("#pPhone").value && state.user.phone) $("#pPhone").value = state.user.phone;
+    if ($("#pEmail") && !$("#pEmail").value && state.user.email) $("#pEmail").value = state.user.email;
     if (state.user.phone && !$("#phoneLookup").value) $("#phoneLookup").value = state.user.phone;
   }
   if ($("#view-admin").classList.contains("active")) loadAdmin();
   if ($("#view-my").classList.contains("active")) refreshMyView();
   if (!$("#alexPanel").hidden && state.user)
     alexAdd(`Signed in as <b>${esc(state.user.name)}</b> — bookings I make now stay linked to your account.`);
-  loadHome();
+  refreshStats();
 }
+
+async function sendLoginOtp() {
+  const identifier = $("#liEmail").value.trim();
+  if (!identifier) { authNote("Enter your registered email or phone number first."); return; }
+  const btn = $("#liSendOtpBtn");
+  const resendBtn = $("#liResendOtpBtn");
+  btn.disabled = true;
+  if (resendBtn) resendBtn.disabled = true;
+  btn.textContent = "Sending OTP…";
+  try {
+    const res = await api("/api/auth/send-otp", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "login", channel: liChannel, identifier }),
+    });
+    liOtpSent = true;
+    $("#liOtpEntryWrap").hidden = false;
+    btn.hidden = true;
+    renderSandboxBanner($("#liOtpSandbox"), res.delivery);
+    startOtpCountdown($("#liOtpTimer"), resendBtn, 25, "login");
+    const dest = res.delivery?.email?.target || res.delivery?.sms?.target || identifier;
+    const isLive = res.delivery?.email?.delivered || res.delivery?.sms?.delivered;
+    authNote(isLive ? `OTP sent to ${dest}. Enter the 6-digit code below.` : `OTP ready for ${dest}. Enter the code shown below.`, true);
+    setTimeout(() => $("#liOtpCode").focus(), 60);
+  } catch (err) {
+    authNote(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send Login OTP";
+  }
+}
+
+$("#liSendOtpBtn")?.addEventListener("click", sendLoginOtp);
+$("#liResendOtpBtn")?.addEventListener("click", sendLoginOtp);
+
+async function sendRegisterOtp() {
+  const name = $("#rgName").value.trim();
+  const email = $("#rgEmail").value.trim();
+  const phone = $("#rgPhone").value.trim();
+  const password = $("#rgPass").value;
+  if (!name || name.length < 2) { authNote("Please enter your full name."); return false; }
+  if (!email) { authNote("Please enter a valid email address."); return false; }
+  if (!phone) { authNote("Please enter a valid 10-digit phone number."); return false; }
+  if (!password || password.length < 6) { authNote("Password must be at least 6 characters."); return false; }
+
+  const btn = $("#rgSendOtpBtn");
+  const resendBtn = $("#rgResendOtpBtn");
+  btn.disabled = true;
+  if (resendBtn) resendBtn.disabled = true;
+  btn.textContent = "Sending OTP…";
+  try {
+    const res = await api("/api/auth/send-otp", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "register", channel: rgChannel, email, phone }),
+    });
+    rgOtpSent = true;
+    $("#rgOtpEntryWrap").hidden = false;
+    btn.hidden = true;
+    $("#rgEmailOtpField").hidden = rgChannel === "sms";
+    $("#rgSmsOtpField").hidden = rgChannel === "email";
+    renderSandboxBanner($("#rgOtpSandbox"), res.delivery);
+    startOtpCountdown($("#rgOtpTimer"), resendBtn, 25, "register");
+    const isLive = res.delivery?.email?.delivered || res.delivery?.sms?.delivered;
+    authNote(
+      isLive ? "Verification OTP sent! Enter the 6-digit code to finish creating your account."
+             : "Verification OTP generated. Enter the 6-digit code shown below to verify.",
+      true
+    );
+    setTimeout(() => $(rgChannel === "sms" ? "#rgSmsOtp" : "#rgEmailOtp")?.focus(), 60);
+    return true;
+  } catch (err) {
+    authNote(err.message);
+    return false;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Send Verification OTP";
+  }
+}
+
+$("#rgSendOtpBtn")?.addEventListener("click", sendRegisterOtp);
+$("#rgResendOtpBtn")?.addEventListener("click", sendRegisterOtp);
 
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const email = $("#liEmail").value.trim();
-  const password = $("#liPass").value;
-  if (!email || !password) { authNote("Enter your email and password to sign in."); return; }
-  const btn = e.target.querySelector('button[type="submit"]');
+  const identifier = $("#liEmail").value.trim();
+  if (!identifier) { authNote("Enter your email or phone number."); return; }
+
+  const btn = $("#authSubmitBtn");
   const label = btn.textContent;
-  btn.disabled = true; btn.textContent = "Signing in…";
+  btn.disabled = true;
+
   try {
-    const res = await api("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+    let res;
+    if (loginMode === "otp") {
+      if (!liOtpSent) {
+        btn.disabled = false;
+        await sendLoginOtp();
+        return;
+      }
+      const code = $("#liOtpCode").value.trim();
+      if (!/^\d{6}$/.test(code)) {
+        authNote("Enter the 6-digit OTP code.");
+        return;
+      }
+      btn.textContent = "Verifying…";
+      res = await api("/api/auth/login-otp", {
+        method: "POST",
+        body: JSON.stringify({ channel: liChannel, identifier, otp: code }),
+      });
+    } else {
+      const password = $("#liPass").value;
+      if (!password) { authNote("Enter your password to sign in."); return; }
+      btn.textContent = "Signing in…";
+      res = await api("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ identifier, password }),
+      });
+    }
+
     if (res.token) localStorage.setItem("medicare_token", res.token);
     state.user = res.user;
     authNote(`Welcome back, ${res.user.name}!`, true);
     await afterAuth();
     toast(`👋 Signed in as ${res.user.name} (${res.user.role})`, "success");
-    setTimeout(() => finishAuth(true), 400);
+    setTimeout(() => finishAuth(true), 300);
   } catch (err) {
     authNote(err.message);
   } finally {
-    btn.disabled = false; btn.textContent = label;
+    btn.disabled = false;
+    btn.textContent = label;
   }
 });
 
 $("#registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const btn = e.target.querySelector('button[type="submit"]');
+  if (!rgOtpSent) {
+    await sendRegisterOtp();
+    return;
+  }
+
+  const btn = $("#rgSubmitBtn");
   const label = btn.textContent;
-  btn.disabled = true; btn.textContent = "Creating…";
+  btn.disabled = true; btn.textContent = "Verifying & creating…";
   try {
     const res = await api("/api/auth/register", {
       method: "POST",
@@ -324,14 +509,17 @@ $("#registerForm").addEventListener("submit", async (e) => {
         email: $("#rgEmail").value.trim(),
         phone: $("#rgPhone").value.trim(),
         password: $("#rgPass").value,
+        channel: rgChannel,
+        email_otp: $("#rgEmailOtp").value.trim(),
+        sms_otp: $("#rgSmsOtp").value.trim(),
       }),
     });
     if (res.token) localStorage.setItem("medicare_token", res.token);
     state.user = res.user;
-    authNote(`Account created — welcome, ${res.user.name}!`, true);
+    authNote(`Account verified & created — welcome, ${res.user.name}!`, true);
     await afterAuth();
-    toast(`✅ Account created for ${res.user.name} (${res.user.role})`, "success");
-    setTimeout(() => finishAuth(true), 400);
+    toast(`✅ Verified account created for ${res.user.name}`, "success");
+    setTimeout(() => finishAuth(true), 300);
   } catch (err) {
     authNote(err.message);
   } finally {
@@ -342,8 +530,10 @@ $("#registerForm").addEventListener("submit", async (e) => {
 $("#logoutBtn").addEventListener("click", async () => {
   try { await api("/api/auth/logout", { method: "POST" }); } catch { /* already signed out */ }
   localStorage.removeItem("medicare_token");
+  sessionStorage.removeItem("medicare_lookup_token");
   state.user = null;
   state.myPhone = "";
+  state.lookupToken = "";
   $("#phoneLookup").value = "";
   renderUser();
   toast("Signed out successfully.");
@@ -352,10 +542,7 @@ $("#logoutBtn").addEventListener("click", async () => {
     $("#myList").innerHTML = `<p class="muted">Search with your phone number to see your appointments.</p>`;
 });
 
-// Demo account click-to-autofill handler
 document.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-demo]");
-  if (btn) { fillDemo(btn.dataset.demo); return; }
   const swap = e.target.closest("[data-authtab].link-btn");
   if (swap && authMode !== "admin") { setAuthTab(swap.dataset.authtab); e.preventDefault(); }
 });
@@ -391,12 +578,7 @@ const DEPTS = [
   ["Neurology", "🧠"], ["Gynecology", "🌸"], ["ENT", "👂"], ["General Medicine", "🩺"],
 ];
 
-async function loadHome() {
-  $("#deptGrid").innerHTML = DEPTS.map(([name, emoji]) =>
-    `<button class="dept-card tilt" data-nav="book" data-specialty="${esc(name)}">
-       <span class="dept-emoji">${emoji}</span>${esc(name)}
-     </button>`).join("");
-  loadHomeDoctors();
+async function refreshStats() {
   try {
     const s = await api("/api/stats");
     const docEl = $("#statDoctors");
@@ -404,6 +586,18 @@ async function loadHome() {
     const bkEl = $("#statBookings");
     if (bkEl && Number(s.total) > 0) bkEl.dataset.target = String(s.total);
   } catch { /* keep static fallback */ }
+}
+
+async function loadHome(skipFetch = false) {
+  $("#deptGrid").innerHTML = DEPTS.map(([name, emoji]) =>
+    `<button class="dept-card tilt" data-nav="book" data-specialty="${esc(name)}">
+       <span class="dept-emoji">${emoji}</span>${esc(name)}
+     </button>`).join("");
+  if (skipFetch && state.allDoctors.length) {
+    renderHomeDoctors(state.allDoctors);
+  } else {
+    await Promise.all([loadHomeDoctors(), refreshStats()]);
+  }
   initCounters();
   initTimeline();
   initSandbox();
@@ -411,34 +605,41 @@ async function loadHome() {
   initTilt();
 }
 
+function renderHomeDoctors(list) {
+  const grid = $("#homeDoctorGrid");
+  if (!grid) return;
+  const today = isoOf(0);
+  const currentDay = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(today + "T12:00:00").getDay()];
+  grid.innerHTML = list.slice(0, 4).map((d, i) => {
+    const worksToday = d.days?.includes(currentDay);
+    return `
+    <article class="home-doc-card tilt" data-reveal="fade-up" style="--i:${i}">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div class="hd-ava" style="background:${AVATAR_COLORS[i % AVATAR_COLORS.length]}">${initials(d.name)}</div>
+        <span class="chip ${worksToday ? 'chip-ok' : 'chip-info'}">${worksToday ? '● Available Today' : '● Next: Tomorrow'}</span>
+      </div>
+      <div class="hd-body" style="margin-top:0.6rem">
+        <strong>${esc(d.name)}</strong>
+        <span>${esc(d.specialty)} · ${esc(d.department || 'Senior Consultant')}</span>
+        <div class="hd-meta" style="margin-top:0.4rem">
+          <span class="hd-rating">★ ${d.rating || 4.9} (${d.experience || 8}+ yrs)</span>
+          <span class="hd-fee">₹${d.fee}</span>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sm" type="button" data-book-doc="${d.id}" style="margin-top:0.8rem">Book Consultation →</button>
+    </article>`;
+  }).join("");
+  initTilt();
+  scanReveals();
+}
+
 async function loadHomeDoctors() {
   const grid = $("#homeDoctorGrid");
   if (!grid) return;
   try {
-    const list = await api("/api/doctors");
-    const today = new Date().toISOString().slice(0, 10);
-    const currentDay = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(today + "T12:00:00").getDay()];
-    grid.innerHTML = list.slice(0, 4).map((d, i) => {
-      const worksToday = d.days?.includes(currentDay);
-      return `
-      <article class="home-doc-card tilt" data-reveal="fade-up" style="--i:${i}">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-          <div class="hd-ava" style="background:${AVATAR_COLORS[i % AVATAR_COLORS.length]}">${initials(d.name)}</div>
-          <span class="chip ${worksToday ? 'chip-ok' : 'chip-info'}">${worksToday ? '● Available Today' : '● Next: Tomorrow'}</span>
-        </div>
-        <div class="hd-body" style="margin-top:0.6rem">
-          <strong>${esc(d.name)}</strong>
-          <span>${esc(d.specialty)} · ${esc(d.department || 'Senior Consultant')}</span>
-          <div class="hd-meta" style="margin-top:0.4rem">
-            <span class="hd-rating">★ ${d.rating || 4.9} (${d.experience || 8}+ yrs)</span>
-            <span class="hd-fee">₹${d.fee}</span>
-          </div>
-        </div>
-        <button class="btn btn-primary btn-sm" type="button" data-book-doc="${d.id}" style="margin-top:0.8rem">Book Consultation →</button>
-      </article>`;
-    }).join("");
-    initTilt();
-    scanReveals();
+    const list = state.allDoctors.length ? state.allDoctors : await api("/api/doctors");
+    if (!state.allDoctors.length) state.allDoctors = list;
+    renderHomeDoctors(list);
   } catch { grid.innerHTML = ""; }
 }
 
@@ -451,10 +652,13 @@ document.addEventListener("click", (e) => {
 });
 
 /* ================================== BOOK ====================================== */
-async function loadDoctors() {
+async function loadDoctors(forceRefresh = false) {
   const q = $("#docSearch").value.trim().toLowerCase();
   const spec = $("#specialtyFilter").value;
-  let list = await api("/api/doctors");
+  if (forceRefresh === true || !state.allDoctors.length) {
+    state.allDoctors = await api("/api/doctors");
+  }
+  let list = state.allDoctors;
   if (spec) list = list.filter((d) => d.specialty === spec);
   if (q) list = list.filter((d) => (d.name + d.specialty + d.department).toLowerCase().includes(q));
   state.doctors = list;
@@ -462,7 +666,7 @@ async function loadDoctors() {
   const grid = $("#doctorGrid");
   if (!list.length) { grid.innerHTML = `<p class="muted">No doctors match your search.</p>`; return; }
   grid.innerHTML = list.map((d, i) => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = isoOf(0);
     const works = d.days.includes(["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(today + "T12:00:00").getDay()]);
     return `
     <article class="doctor-card ${state.selectedDoctor?.id === d.id ? "selected" : ""}" data-doctor="${d.id}">
@@ -605,12 +809,17 @@ $("#bookForm").addEventListener("submit", async (e) => {
     });
     toast(`✅ Booking confirmed! Appointment #${created.id} — ${fmtDate(created.appt_date)} at ${created.slot_time}`, "success");
     e.target.reset();
+    if (state.user) {
+      $("#pName").value = state.user.name || "";
+      if (state.user.phone) $("#pPhone").value = state.user.phone;
+      if (state.user.email) $("#pEmail").value = state.user.email;
+    }
     state.selectedSlot = null;
     loadSlots();
     updateSummary();
-    loadHome();
+    refreshStats();
     if (state.myPhone) loadMyBookings();
-    setTimeout(() => openCheckout(created), 450); // payment step after booking
+    setTimeout(() => openCheckout(created), 350); // payment step after booking
   } catch (err) {
     toast(err.message, "error");
     loadSlots(); // refresh availability
@@ -749,16 +958,76 @@ async function showReceiptFor(appt) {
 }
 
 /* ============================== MY BOOKINGS ==================================== */
+async function triggerLookupOtp(phone) {
+  const box = $("#myLookupOtpBox");
+  const note = $("#myLookupOtpNote");
+  const sb = $("#myLookupSandbox");
+  box.hidden = false;
+  note.textContent = "Sending SMS verification OTP…";
+  sb.hidden = true;
+  try {
+    const res = await api("/api/auth/send-otp", {
+      method: "POST",
+      body: JSON.stringify({ purpose: "lookup", channel: "sms", phone }),
+    });
+    note.textContent = res.delivery?.sms?.delivered
+      ? `SMS OTP sent to ${res.delivery.sms.target}. Enter it below to view your bookings.`
+      : `Enter the 6-digit SMS OTP for ${res.delivery?.sms?.target || phone} to view your bookings.`;
+    renderSandboxBanner(sb, res.delivery);
+    startOtpCountdown($("#myLookupTimer"), $("#myLookupResendBtn"), 25, "lookup");
+    setTimeout(() => $("#myLookupOtpInput").focus(), 60);
+  } catch (err) {
+    note.textContent = err.message;
+    toast(err.message, "error");
+  }
+}
+
+$("#myLookupVerifyBtn")?.addEventListener("click", async () => {
+  const phone = state.myPhone || $("#phoneLookup").value.trim();
+  const code = $("#myLookupOtpInput").value.trim();
+  if (!phone) return toast("Enter your phone number first.", "error");
+  if (!/^\d{6}$/.test(code)) return toast("Enter the 6-digit SMS OTP.", "error");
+  try {
+    const res = await api("/api/auth/verify-lookup-otp", {
+      method: "POST",
+      body: JSON.stringify({ phone, otp: code }),
+    });
+    state.lookupToken = res.lookupToken;
+    sessionStorage.setItem("medicare_lookup_token", res.lookupToken);
+    $("#myLookupOtpBox").hidden = true;
+    $("#myLookupOtpInput").value = "";
+    toast("📱 Phone verified!", "success");
+    loadMyBookings();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+});
+
+$("#myLookupResendBtn")?.addEventListener("click", () => {
+  const phone = state.myPhone || $("#phoneLookup").value.trim();
+  if (phone) triggerLookupOtp(phone);
+});
+
 async function loadMyBookings() {
   const phone = state.myPhone;
   const list = $("#myList");
-  if (!phone) { list.innerHTML = `<p class="muted">Search with your phone number to see your appointments.</p>`; return; }
+  if (!phone) {
+    $("#myLookupOtpBox").hidden = true;
+    list.innerHTML = `<p class="muted">Search with your phone number to see your appointments.</p>`;
+    return;
+  }
   list.innerHTML = `<p class="muted">Searching…</p>`;
   try {
     const rows = await api(`/api/appointments?phone=${encodeURIComponent(phone)}&sort=upcoming`);
+    $("#myLookupOtpBox").hidden = true;
     if (!rows.length) { list.innerHTML = `<p class="muted">No bookings found for “${esc(phone)}”. <button class="btn btn-ghost btn-sm" data-nav="book">Book one now</button></p>`; return; }
     list.innerHTML = rows.map(apptCard).join("");
   } catch (err) {
+    if (err.code === "lookup_otp_required") {
+      list.innerHTML = `<p class="muted">Please verify your phone number via SMS OTP above to view your bookings.</p>`;
+      triggerLookupOtp(phone);
+      return;
+    }
     list.innerHTML = `<p class="muted">${esc(err.message)}</p>`;
   }
 }
@@ -974,7 +1243,7 @@ $("#adminSignin").addEventListener("click", async () => {
     : "Enter the admin account to open the panel.";
   const ok = await showAuth(note, { force: true, mode: "admin" });
   if (ok && state.user?.role !== "admin")
-    showAdminGate("That account isn't an admin — sign in with Ayush Gupta (ayushgupta7440@gmail.com / admin123) or admin@medicare.local.");
+    showAdminGate("That account does not have administrator privileges. Sign in with your admin email (ayushgupta7440@gmail.com).");
   else loadAdmin();
 });
 
@@ -1041,7 +1310,7 @@ function debounce(fn, ms) {
 
 /* ------------------------------- global wiring ---------------------------------- */
 function refreshAll() {
-  loadHome();
+  refreshStats();
   if (state.selectedDoctor) loadSlots();
   if (state.myPhone) loadMyBookings();
   if ($("#view-my").classList.contains("active") && !state.myPhone) showAllMine();
@@ -1102,6 +1371,10 @@ $("#emgForm").addEventListener("submit", async (e) => {
 });
 
 function renderEmergencyResult(a) {
+  if (a.lookupToken) {
+    state.lookupToken = a.lookupToken;
+    sessionStorage.setItem("medicare_lookup_token", a.lookupToken);
+  }
   const box = $("#emgResult");
   box.hidden = false;
   box.innerHTML = `
@@ -1241,11 +1514,11 @@ $("#doctorSave").addEventListener("click", async (e) => {
 });
 
 async function refreshDoctorsEverywhere() {
-  await loadDoctors();
+  await loadDoctors(true);
   populateSpecialtyFilter();
   populateEmgSpecialties();
   await loadDoctorMgmt();
-  loadHome();
+  renderHomeDoctors(state.allDoctors);
   if (!state.selectedDoctor) { $("#slotStep").hidden = true; $("#formStep").hidden = true; }
 }
 
@@ -1923,12 +2196,13 @@ async function checkDbStatus() {
     const pill = $("#dbStatusPill");
     if (!pill) return;
     if (res.mongodb?.status === "connected") {
-      pill.innerHTML = `<span class="dot green"></span> MongoDB Connected`;
-      pill.title = `MongoDB active on ${res.mongodb.database} & SQLite hospital.db`;
+      const dbName = res.mongodb.database || "MongoDB";
+      pill.innerHTML = `<span class="dot green"></span> MongoDB (${esc(dbName)})`;
+      pill.title = `MongoDB Atlas connected (${dbName}) in ${res.mongodb.connectMs ?? "?"}ms`;
       pill.className = "db-pill live";
     } else {
       pill.innerHTML = `<span class="dot orange"></span> SQLite Active`;
-      pill.title = `SQLite active; MongoDB disconnected`;
+      pill.title = `SQLite active; MongoDB offline${res.mongodb?.error ? ": " + res.mongodb.error : ""}`;
       pill.className = "db-pill fallback";
     }
   } catch {}
@@ -2337,8 +2611,7 @@ function initSandbox() {
   const bentoAlexBtn = $("#openAlexFromBento");
 
   const openAlexModal = () => {
-    $("#alexPanel")?.removeAttribute("hidden");
-    $("#alexText")?.focus();
+    openAlex();
   };
 
   if (alexBtn && !alexBtn.dataset.bound) {
@@ -2352,8 +2625,8 @@ function initSandbox() {
 
   if (!chips.length || !docInfo || !slotGrid) return;
 
-  const renderSandbox = (spec) => {
-    const doc = state.doctors?.find((d) => d.specialty === spec) || state.doctors?.[0];
+  const renderSandbox = async (spec) => {
+    const doc = (state.allDoctors.length ? state.allDoctors : state.doctors)?.find((d) => d.specialty === spec) || state.doctors?.[0];
     if (!doc) return;
 
     docInfo.innerHTML = `
@@ -2373,12 +2646,28 @@ function initSandbox() {
       </div>
     `;
 
-    const sampleSlots = ["09:00 AM", "10:00 AM", "11:30 AM", "02:00 PM", "03:30 PM", "05:00 PM"];
-    slotGrid.innerHTML = sampleSlots.map((time) => `
-      <button type="button" class="sandbox-slot-btn" data-sandbox-time="${time}">
-        <span>${time}</span>
-      </button>
-    `).join("");
+    slotGrid.innerHTML = `<span class="muted" style="font-size:0.82rem">Loading live slots…</span>`;
+    try {
+      const tomorrow = isoOf(1);
+      const data = await api(`/api/slots?doctorId=${doc.id}&date=${tomorrow}`);
+      const freeSlots = data.working ? data.slots.filter((s) => s.available).slice(0, 6) : [];
+      if (!freeSlots.length) {
+        slotGrid.innerHTML = `<span class="muted" style="font-size:0.82rem">${esc(doc.name)} is off tomorrow — click to view other dates.</span>`;
+        return;
+      }
+      slotGrid.innerHTML = freeSlots.map((s) => `
+        <button type="button" class="sandbox-slot-btn" data-sandbox-time="${esc(s.time)}" data-sandbox-date="${esc(tomorrow)}">
+          <span>${esc(s.time)}</span>
+        </button>
+      `).join("");
+    } catch {
+      const fallback = ["09:00", "10:00", "11:30", "14:00", "15:30", "17:00"];
+      slotGrid.innerHTML = fallback.map((time) => `
+        <button type="button" class="sandbox-slot-btn" data-sandbox-time="${time}" data-sandbox-date="${isoOf(1)}">
+          <span>${time}</span>
+        </button>
+      `).join("");
+    }
   };
 
   chips.forEach((chip) => {
@@ -2421,11 +2710,16 @@ function initSandbox() {
   initStackingCards();
   initTimeline();
   initCounters();
-  await refreshUser();
-  await loadDoctors();
+  await Promise.all([refreshUser(), loadDoctors(true), refreshStats()]);
   populateSpecialtyFilter();
-  await loadHome();
-  await loadDoctorMgmt();
+  await loadHome(true);
+  if (state.user?.role === "admin") loadDoctorMgmt();
+  if (state.user) {
+    if (!$("#pName").value) $("#pName").value = state.user.name || "";
+    if (!$("#pPhone").value && state.user.phone) $("#pPhone").value = state.user.phone;
+    if ($("#pEmail") && !$("#pEmail").value && state.user.email) $("#pEmail").value = state.user.email;
+    if (state.user.phone && !$("#phoneLookup").value) $("#phoneLookup").value = state.user.phone;
+  }
   populateEmgSpecialties();
   initSandbox();
   $("#apptDate").value = isoOf(1);
