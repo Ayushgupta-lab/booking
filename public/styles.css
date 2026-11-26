@@ -509,6 +509,7 @@ dialog.auth-modal.closing .auth-shell { animation: authPopOut 0.26s ease forward
 
 .role-badge { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.15rem 0.5rem; border-radius: 999px; }
 .role-badge.admin { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.role-badge.doctor { background: #ccfbf1; color: #0f766e; border: 1px solid #99f6e4; }
 .role-badge.patient { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
 
 .db-pill { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 999px; background: #f1f5f9; color: var(--muted); border: 1px solid #e2e8f0; }

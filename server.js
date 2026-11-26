@@ -80,6 +80,9 @@ function hasValidLookupAccess(req, targetPhone) {
 function userCanAccessAppt(req, appt) {
   if (!appt) return false;
   if (req.user && req.user.role === "admin") return true;
+  if (req.user && req.user.role === "doctor" && req.user.doctor_id && Number(appt.doctor_id) === Number(req.user.doctor_id)) {
+    return true;
+  }
   if (req.user) {
     if (appt.user_id != null && Number(appt.user_id) === Number(req.user.id)) return true;
     if (req.user.phone && otp.phoneDigitsMatch(req.user.phone, appt.phone)) return true;
@@ -192,8 +195,16 @@ app.use(
         return res.status(401).json({ error: hint, code: "auth_required" });
       }
 
-      if (p.startsWith("/doctors") && req.user.role !== "admin") {
-        return res.status(403).json({ error: "Only an admin account can manage doctors." });
+      if (p.startsWith("/doctors")) {
+        const docPutMatch = method === "PUT" && p.match(/^\/doctors\/(\d+)$/);
+        const isOwnDoctorEdit =
+          docPutMatch &&
+          req.user.role === "doctor" &&
+          req.user.doctor_id &&
+          Number(docPutMatch[1]) === Number(req.user.doctor_id);
+        if (req.user.role !== "admin" && !isOwnDoctorEdit) {
+          return res.status(403).json({ error: "Only an admin (or the doctor for their own profile) can update doctors." });
+        }
       }
       if (apptMatch) {
         const appt = await db.findAppointmentRaw(Number(apptMatch[1]));
@@ -221,8 +232,8 @@ app.use(
           code: "lookup_otp_required",
         });
       }
-      if (!req.user || req.user.role !== "admin") {
-        return res.status(401).json({ error: "Sign in as an admin to see every appointment.", code: "auth_required" });
+      if (!req.user || (req.user.role !== "admin" && !(req.user.role === "doctor" && req.user.doctor_id))) {
+        return res.status(401).json({ error: "Sign in as a doctor or admin to see appointments.", code: "auth_required" });
       }
     }
     return next();
@@ -233,35 +244,18 @@ app.use(
 app.post(
   "/api/auth/send-otp",
   ah(async (req, res) => {
-    const { purpose = "register", channel = "email", email, phone, identifier } = req.body || {};
-    if (!["register", "reset", "lookup"].includes(purpose)) {
-      return res.status(400).json({ error: "Invalid OTP purpose." });
+    const { purpose = "reset", channel = "email", email, phone, identifier } = req.body || {};
+    if (!["reset", "lookup"].includes(purpose)) {
+      return res.status(400).json({ error: "OTP is only required for password reset or phone booking lookup." });
     }
-    if (!["email", "sms", "both"].includes(channel)) {
+    if (!["email", "sms"].includes(channel)) {
       return res.status(400).json({ error: "Invalid OTP delivery channel." });
     }
 
     let cleanEmail = null;
     let normPhone = null;
 
-    if (purpose === "register") {
-      const emailCheck = await otp.validateEmailAddress(email);
-      if (!emailCheck.ok) return res.status(400).json({ error: emailCheck.error });
-      cleanEmail = emailCheck.email;
-
-      const phoneCheck = otp.normalizePhoneNumber(phone);
-      if (!phoneCheck.ok) return res.status(400).json({ error: phoneCheck.error });
-      normPhone = phoneCheck;
-
-      const existingByEmail = await db.findUserByEmail(cleanEmail);
-      if (existingByEmail) {
-        return res.status(409).json({ error: "An account with this email already exists — please sign in." });
-      }
-      const existingByPhone = await db.findUserByPhone(normPhone.phone);
-      if (existingByPhone) {
-        return res.status(409).json({ error: "An account with this phone number already exists — please sign in." });
-      }
-    } else if (purpose === "reset") {
+    if (purpose === "reset") {
       const rawId = identifier || (channel === "sms" ? phone : email);
       const user = await db.findUserByIdentifier(rawId);
       if (!user) {
@@ -279,10 +273,6 @@ app.post(
         }
       } else {
         cleanEmail = user.email;
-        if (channel === "both" && user.phone) {
-          const p = otp.normalizePhoneNumber(user.phone);
-          if (p.ok) normPhone = p;
-        }
       }
     } else if (purpose === "lookup") {
       const phoneCheck = otp.normalizePhoneNumber(phone);
@@ -351,7 +341,15 @@ app.post(
 app.post(
   "/api/auth/register",
   ah(async (req, res) => {
-    const { name, email, phone, password, channel = "email", otp: singleOtp, email_otp, sms_otp } = req.body || {};
+    const {
+      name,
+      email,
+      phone,
+      password,
+      role = "patient",
+      specialty,
+      fee,
+    } = req.body || {};
 
     if (!name || String(name).trim().length < 2) {
       return res.status(400).json({ error: "Your full name is required." });
@@ -367,9 +365,8 @@ app.post(
     if (!password || String(password).length < 6) {
       return res.status(400).json({ error: "Password must be at least 6 characters." });
     }
-    if (!["email", "sms", "both"].includes(channel)) {
-      return res.status(400).json({ error: "Invalid verification channel." });
-    }
+
+    const chosenRole = role === "doctor" ? "doctor" : "patient";
 
     // Never allow overwriting or hijacking existing accounts (including admin)
     if (await db.findUserByEmail(cleanEmail)) {
@@ -379,21 +376,24 @@ app.post(
       return res.status(409).json({ error: "An account with that phone number already exists — please sign in." });
     }
 
-    // Strict OTP verification gate
-    let emailVerified = false;
-    let phoneVerified = false;
-
-    if (channel === "email" || channel === "both") {
-      const code = email_otp || (channel === "email" ? singleOtp : "");
-      const resEmail = await verifyStoredOtp("register", "email", cleanEmail, code);
-      if (!resEmail.ok) return res.status(resEmail.status).json({ error: `Email OTP: ${resEmail.error}` });
-      emailVerified = true;
-    }
-    if (channel === "sms" || channel === "both") {
-      const code = sms_otp || (channel === "sms" ? singleOtp : "");
-      const resSms = await verifyStoredOtp("register", "sms", normPhone, code);
-      if (!resSms.ok) return res.status(resSms.status).json({ error: `SMS OTP: ${resSms.error}` });
-      phoneVerified = true;
+    let doctorId = null;
+    if (chosenRole === "doctor") {
+      const cleanName = String(name).trim();
+      const displayDocName = /^dr\.?\s/i.test(cleanName) ? cleanName : `Dr. ${cleanName}`;
+      const cleanSpec = String(specialty || "General Medicine").trim() || "General Medicine";
+      const parsedFee = Number(fee);
+      const docFee = Number.isFinite(parsedFee) && parsedFee >= 0 ? parsedFee : 500;
+      const createdDoc = await db.createDoctor({
+        name: displayDocName,
+        specialty: cleanSpec,
+        department: cleanSpec,
+        fee: docFee,
+        rating: 4.8,
+        experience: 5,
+        bio: `${cleanSpec} specialist at MediCare Hospital.`,
+        days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      });
+      doctorId = createdDoc.id;
     }
 
     const user = await db.createUser({
@@ -401,9 +401,10 @@ app.post(
       email: cleanEmail,
       phone: normPhone,
       password,
-      role: "patient",
-      email_verified: emailVerified,
-      phone_verified: phoneVerified,
+      role: chosenRole,
+      doctor_id: doctorId,
+      email_verified: true,
+      phone_verified: true,
     });
 
     const { token, ttlMs } = await db.createSession(user.id);
@@ -804,12 +805,16 @@ app.get(
   "/api/appointments",
   ah(async (req, res) => {
     const { search, status, doctorId, phone, from, to, sort = "upcoming", mine } = req.query;
+    const enforcedDoctorId =
+      !mine && !phone && req.user?.role === "doctor" && req.user.doctor_id
+        ? req.user.doctor_id
+        : doctorId;
     const rows = await db.listAppointments({
       user: req.user,
       mine: Boolean(mine),
       search,
       status,
-      doctorId,
+      doctorId: enforcedDoctorId,
       phone,
       from,
       to,
@@ -837,7 +842,11 @@ app.get(
 app.get(
   "/api/stats",
   ah(async (req, res) => {
-    res.json(await db.getStats());
+    const scopeDoctorId =
+      req.query.scope === "doctor" && req.user?.role === "doctor" && req.user.doctor_id
+        ? req.user.doctor_id
+        : null;
+    res.json(await db.getStats(scopeDoctorId));
   })
 );
 

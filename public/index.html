@@ -999,8 +999,8 @@
     <section id="view-admin" class="view">
       <div class="container section">
         <div class="page-head">
-          <h1>Admin panel</h1>
-          <p>Every booking in one place — create, read, update and delete.</p>
+          <h1 id="adminPanelTitle">Admin panel</h1>
+          <p id="adminPanelSub">Every booking in one place — create, read, update and delete.</p>
         </div>
 
         <div id="adminGate" class="admin-gate" hidden>
@@ -1047,7 +1047,7 @@
 
         <!-- ---------------- Manage doctors ---------------- -->
         <div class="doc-mgmt-head">
-          <h2>Manage doctors</h2>
+          <h2 id="docMgmtTitle">Manage doctors</h2>
           <button id="addDoctorBtn" class="btn btn-primary">+ Add new doctor</button>
         </div>
         <div class="doc-mgmt-grid" id="docMgmtGrid"><p class="muted">Loading…</p></div>
@@ -1257,61 +1257,65 @@
       </form>
 
       <form id="registerForm" class="auth-form" hidden novalidate>
+        <div class="field">
+          <label>Create account as</label>
+          <div class="otp-mode-switch" role="group" aria-label="Account role">
+            <button type="button" class="otp-mode-btn active" data-rgrole="patient">🧑 Patient</button>
+            <button type="button" class="otp-mode-btn" data-rgrole="doctor">🩺 Doctor</button>
+          </div>
+        </div>
         <div class="field"><label for="rgName">Full name *</label>
           <input id="rgName" class="input" required placeholder="e.g. Aarav Patel" autocomplete="name" /></div>
         <div class="field"><label for="rgEmail">Email *</label>
           <input id="rgEmail" type="email" class="input" required placeholder="you@gmail.com" autocomplete="email" /></div>
         <div class="field"><label for="rgPhone">Phone number *</label>
           <input id="rgPhone" type="tel" class="input" required placeholder="e.g. +91 9876543210" autocomplete="tel" /></div>
+        <div id="rgDoctorFields" class="fp-pass-fields" hidden>
+          <div class="form-grid" style="gap:0.75rem">
+            <div class="field"><label for="rgSpecialty">Specialty *</label>
+              <select id="rgSpecialty" class="input">
+                <option value="General Medicine">General Medicine</option>
+                <option value="Cardiology">Cardiology</option>
+                <option value="Dermatology">Dermatology</option>
+                <option value="Pediatrics">Pediatrics</option>
+                <option value="Orthopedics">Orthopedics</option>
+                <option value="Neurology">Neurology</option>
+                <option value="Gynecology">Gynecology</option>
+                <option value="ENT">ENT</option>
+              </select>
+            </div>
+            <div class="field"><label for="rgFee">Fee (₹)</label>
+              <input id="rgFee" type="number" min="0" class="input" value="500" placeholder="500" />
+            </div>
+          </div>
+        </div>
         <div class="field"><label for="rgPass">Password *</label>
           <div class="pass-wrap">
             <input id="rgPass" type="password" class="input" required minlength="6" placeholder="At least 6 characters" autocomplete="new-password" />
             <button type="button" class="eye-btn" data-eye="rgPass" aria-label="Show password">Show</button>
           </div>
-          <p class="hint" id="rgHint">Minimum 6 characters.</p></div>
+          <p class="hint" id="rgHint">Minimum 6 characters — no OTP needed to sign up.</p></div>
 
-        <div class="otp-box" id="rgOtpPanel">
-          <div class="otp-channel-row">
-            <span class="otp-ch-lbl">Verify via:</span>
-            <button type="button" class="otp-ch-btn active" data-rgchannel="email">📧 Email OTP</button>
-            <button type="button" class="otp-ch-btn" data-rgchannel="sms">📱 SMS OTP</button>
-            <button type="button" class="otp-ch-btn" data-rgchannel="both">📧+📱 Both</button>
-          </div>
-          <div id="rgOtpEntryWrap" hidden>
-            <div class="otp-box-head">
-              <strong>Enter Verification OTP</strong>
-              <span class="otp-timer" id="rgOtpTimer"></span>
-            </div>
-            <div id="rgOtpSandbox" class="otp-sandbox" hidden></div>
-            <div id="rgEmailOtpField" class="field" style="margin-bottom:0.45rem">
-              <label for="rgEmailOtp">Email 6-digit OTP</label>
-              <input id="rgEmailOtp" class="input otp-input" inputmode="numeric" maxlength="6" placeholder="6-digit Email OTP" autocomplete="one-time-code" />
-            </div>
-            <div id="rgSmsOtpField" class="field" hidden style="margin-bottom:0.45rem">
-              <label for="rgSmsOtp">Phone SMS 6-digit OTP</label>
-              <input id="rgSmsOtp" class="input otp-input" inputmode="numeric" maxlength="6" placeholder="6-digit SMS OTP" autocomplete="one-time-code" />
-            </div>
-            <button type="button" class="btn btn-ghost btn-sm" id="rgResendOtpBtn">↻ Resend OTP</button>
-          </div>
-          <button type="button" class="btn btn-ghost btn-sm" id="rgSendOtpBtn" style="width:100%">Send Verification OTP</button>
-        </div>
-
-        <button class="btn btn-primary btn-lg" type="submit" id="rgSubmitBtn">Verify &amp; Create account</button>
+        <button class="btn btn-primary btn-lg" type="submit" id="rgSubmitBtn">Create account</button>
         <p class="hint auth-switch" id="authSwitch2">Already have an account? <button type="button" class="link-btn" data-authtab="login">Sign in</button></p>
       </form>
 
-      <!-- PATIENT LOGIN HINT (Default: ONLY shows patient) -->
+      <!-- PATIENT / DOCTOR HINT -->
       <div class="auth-hint" id="patientAuthHint">
         <div class="auth-switch-row">
-          <span>Hospital Staff or Doctor?</span>
-          <button type="button" class="btn-switch-portal" id="toAdminLogin">Admin Login →</button>
+          <span>Doctor or Hospital Admin?</span>
+          <div style="display:flex;gap:0.6rem;align-items:center">
+            <button type="button" class="btn-switch-portal" id="toDoctorCreate">Create Doctor Account</button>
+            <button type="button" class="btn-switch-portal" id="toAdminLogin">Staff Login →</button>
+          </div>
         </div>
       </div>
 
-      <!-- ADMIN LOGIN HINT (ONLY shown in admin login mode) -->
+      <!-- STAFF / ADMIN LOGIN HINT -->
       <div class="auth-hint" id="adminAuthHint" hidden>
         <div class="auth-switch-row">
           <button type="button" class="btn-switch-portal" id="toPatientLogin">← Back to Patient Sign in</button>
+          <button type="button" class="btn-switch-portal" id="toDoctorCreateFromStaff">New Doctor? Sign up →</button>
         </div>
       </div>
       </section>

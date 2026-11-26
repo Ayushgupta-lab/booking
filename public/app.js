@@ -103,14 +103,22 @@ function renderUser() {
   $("#userChip").hidden = !u;
 
   const isAdmin = u && u.role === "admin";
+  const isDoctor = u && u.role === "doctor";
   const navAdmin = $("#navAdminLink");
-  if (navAdmin) navAdmin.hidden = !isAdmin;
+  if (navAdmin) {
+    navAdmin.hidden = !(isAdmin || isDoctor);
+    navAdmin.textContent = isDoctor ? "Doctor Panel" : "Admin Panel";
+  }
 
   const roleEl = $("#userRoleBadge");
   if (roleEl) {
     if (isAdmin) {
       roleEl.textContent = "Admin";
       roleEl.className = "role-badge admin";
+      roleEl.hidden = false;
+    } else if (isDoctor) {
+      roleEl.textContent = "Doctor";
+      roleEl.className = "role-badge doctor";
       roleEl.hidden = false;
     } else {
       roleEl.hidden = true; // DO NOT show role badge for patient
@@ -128,9 +136,7 @@ let forgotMode = false;
 let fpChannel = "email";    // "email" | "sms"
 let fpOtpSent = false;
 let fpSentTarget = "";
-let rgChannel = "email";    // "email" | "sms" | "both"
-let rgOtpSent = false;
-let rgSentKey = "";
+let rgRole = "patient";     // "patient" | "doctor"
 const otpTimers = {};
 
 function startOtpCountdown(timerEl, btnEl, seconds = 25, key = "default") {
@@ -169,17 +175,20 @@ function renderSandboxBanner(el, delivery) {
 
 function authTitleText() {
   if (forgotMode) return "Reset password";
-  return authMode === "admin" ? "🔐 Admin sign-in"
-    : authTab === "register" ? "Create verified account" : "Welcome back";
+  return authMode === "admin" ? "🔐 Staff & Doctor sign-in"
+    : authTab === "register" ? "Create account" : "Welcome back";
 }
 function applyAuthHeaders() {
   $("#authTitle").textContent = authTitleText();
   const sub = $("#authSub");
   if (sub) {
     if (forgotMode) sub.textContent = "Verify your identity via Email or SMS OTP to create a new password.";
-    else if (authMode === "admin") sub.textContent = "Staff & administrator access — manage bookings, slots and the team.";
-    else if (authTab === "register") sub.textContent = "Verified via Email or Phone SMS OTP for secure appointments.";
-    else sub.textContent = "Sign in to book appointments, pay online and track your visits.";
+    else if (authMode === "admin") sub.textContent = "Doctors & hospital staff — sign in to manage bookings and schedules.";
+    else if (authTab === "register") {
+      sub.textContent = rgRole === "doctor"
+        ? "Create your Doctor account with a password to view patient bookings & manage your schedule."
+        : "Create your patient account with a password to book appointments and manage visits.";
+    } else sub.textContent = "Sign in to book appointments, pay online and track your visits.";
   }
 }
 
@@ -216,18 +225,14 @@ function setForgotMode(on) {
   setAuthMode(authMode);
 }
 
-function setRgChannel(ch) {
-  rgChannel = ch;
-  $$("[data-rgchannel]").forEach((b) => b.classList.toggle("active", b.dataset.rgchannel === ch));
-  rgOtpSent = false;
-  rgSentKey = "";
-  $("#rgOtpEntryWrap").hidden = true;
-  $("#rgOtpSandbox").hidden = true;
-  $("#rgSendOtpBtn").hidden = false;
-  $("#rgEmailOtp").value = "";
-  $("#rgSmsOtp").value = "";
-  $("#rgEmailOtpField").hidden = ch === "sms";
-  $("#rgSmsOtpField").hidden = ch === "email";
+function setRgRole(role) {
+  rgRole = role === "doctor" ? "doctor" : "patient";
+  $$("[data-rgrole]").forEach((b) => b.classList.toggle("active", b.dataset.rgrole === rgRole));
+  const isDoc = rgRole === "doctor";
+  $("#rgDoctorFields").hidden = !isDoc;
+  $("#rgName").placeholder = isDoc ? "e.g. Dr. Neha Verma" : "e.g. Aarav Patel";
+  $("#rgSubmitBtn").textContent = isDoc ? "Create doctor account" : "Create account";
+  if (authTab === "register") applyAuthHeaders();
 }
 
 function setAuthMode(mode) {
@@ -248,7 +253,7 @@ function setAuthMode(mode) {
     if (pHint) pHint.hidden = true;
     if (aHint) aHint.hidden = false;
     if (sw) sw.hidden = true;
-    $("#liEmail").placeholder = "Admin email or phone";
+    $("#liEmail").placeholder = "Doctor or Admin email / phone";
     $("#liEmail").autofocus = true;
   } else {
     if (tabs) tabs.hidden = false;
@@ -268,7 +273,7 @@ function showAuth(message = "", { force = false, mode = "patient", tone = "info"
   clearTimeout(authCloseTimer);
   const modal = $("#authModal");
   modal.classList.remove("closing");
-  setRgChannel("email");
+  setRgRole("patient");
   setFpChannel("email");
   setAuthMode(mode);
   if (message) authNote(message, tone);
@@ -300,10 +305,20 @@ $("#authBtn").addEventListener("click", () => showAuth("", { mode: "patient" }))
 
 $("#toAdminLogin")?.addEventListener("click", () => setAuthMode("admin"));
 $("#toPatientLogin")?.addEventListener("click", () => setAuthMode("patient"));
+$("#toDoctorCreate")?.addEventListener("click", () => {
+  setAuthMode("patient");
+  setAuthTab("register");
+  setRgRole("doctor");
+});
+$("#toDoctorCreateFromStaff")?.addEventListener("click", () => {
+  setAuthMode("patient");
+  setAuthTab("register");
+  setRgRole("doctor");
+});
 $("#toForgotPass")?.addEventListener("click", () => setForgotMode(true));
 $("#backToLoginFromForgot")?.addEventListener("click", () => setForgotMode(false));
 $$("[data-fpchannel]").forEach((b) => b.addEventListener("click", () => setFpChannel(b.dataset.fpchannel)));
-$$("[data-rgchannel]").forEach((b) => b.addEventListener("click", () => setRgChannel(b.dataset.rgchannel)));
+$$("[data-rgrole]").forEach((b) => b.addEventListener("click", () => setRgRole(b.dataset.rgrole)));
 
 function setAuthTab(tab) {
   authTab = tab;
@@ -358,22 +373,6 @@ $$("[data-eye]").forEach((btn) => btn.addEventListener("click", () => {
     }
   }));
 
-$("#rgEmail")?.addEventListener("input", () => {
-  if (rgOtpSent && rgSentKey !== `${$("#rgEmail").value.trim()}|${$("#rgPhone").value.trim()}`) {
-    rgOtpSent = false;
-    $("#rgOtpEntryWrap").hidden = true;
-    $("#rgOtpSandbox").hidden = true;
-    $("#rgSendOtpBtn").hidden = false;
-  }
-});
-$("#rgPhone")?.addEventListener("input", () => {
-  if (rgOtpSent && rgSentKey !== `${$("#rgEmail").value.trim()}|${$("#rgPhone").value.trim()}`) {
-    rgOtpSent = false;
-    $("#rgOtpEntryWrap").hidden = true;
-    $("#rgOtpSandbox").hidden = true;
-    $("#rgSendOtpBtn").hidden = false;
-  }
-});
 $("#fpIdentifier")?.addEventListener("input", () => {
   if (fpOtpSent && fpSentTarget !== $("#fpIdentifier").value.trim()) {
     fpOtpSent = false;
@@ -454,54 +453,6 @@ async function sendForgotOtp() {
 $("#fpSendOtpBtn")?.addEventListener("click", sendForgotOtp);
 $("#fpResendOtpBtn")?.addEventListener("click", sendForgotOtp);
 
-async function sendRegisterOtp() {
-  const name = $("#rgName").value.trim();
-  const email = $("#rgEmail").value.trim();
-  const phone = $("#rgPhone").value.trim();
-  const password = $("#rgPass").value;
-  if (!name || name.length < 2) { authNote("Please enter your full name."); return false; }
-  if (!email) { authNote("Please enter a valid email address."); return false; }
-  if (!phone) { authNote("Please enter a valid 10-digit phone number."); return false; }
-  if (!password || password.length < 6) { authNote("Password must be at least 6 characters."); return false; }
-
-  const btn = $("#rgSendOtpBtn");
-  const resendBtn = $("#rgResendOtpBtn");
-  btn.disabled = true;
-  if (resendBtn) resendBtn.disabled = true;
-  btn.textContent = "Sending OTP…";
-  try {
-    const res = await api("/api/auth/send-otp", {
-      method: "POST",
-      body: JSON.stringify({ purpose: "register", channel: rgChannel, email, phone }),
-    });
-    rgOtpSent = true;
-    rgSentKey = `${email}|${phone}`;
-    $("#rgOtpEntryWrap").hidden = false;
-    btn.hidden = true;
-    $("#rgEmailOtpField").hidden = rgChannel === "sms";
-    $("#rgSmsOtpField").hidden = rgChannel === "email";
-    renderSandboxBanner($("#rgOtpSandbox"), res.delivery);
-    startOtpCountdown($("#rgOtpTimer"), resendBtn, 25, "register");
-    const isLive = res.delivery?.email?.delivered || res.delivery?.sms?.delivered;
-    authNote(
-      isLive ? "Verification OTP sent! Enter the 6-digit code to finish creating your account."
-             : "Verification OTP generated. Enter the 6-digit code shown below to verify.",
-      true
-    );
-    setTimeout(() => $(rgChannel === "sms" ? "#rgSmsOtp" : "#rgEmailOtp")?.focus(), 60);
-    return true;
-  } catch (err) {
-    authNote(err.message);
-    return false;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Send Verification OTP";
-  }
-}
-
-$("#rgSendOtpBtn")?.addEventListener("click", sendRegisterOtp);
-$("#rgResendOtpBtn")?.addEventListener("click", sendRegisterOtp);
-
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const identifier = $("#liEmail").value.trim();
@@ -573,32 +524,45 @@ $("#forgotForm").addEventListener("submit", async (e) => {
 
 $("#registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  if (!rgOtpSent) {
-    await sendRegisterOtp();
-    return;
-  }
+  const name = $("#rgName").value.trim();
+  const email = $("#rgEmail").value.trim();
+  const phone = $("#rgPhone").value.trim();
+  const password = $("#rgPass").value;
+  if (!name || name.length < 2) { authNote("Please enter your full name."); return; }
+  if (!email) { authNote("Please enter a valid email address."); return; }
+  if (!phone) { authNote("Please enter a valid 10-digit phone number."); return; }
+  if (!password || password.length < 6) { authNote("Password must be at least 6 characters."); return; }
 
   const btn = $("#rgSubmitBtn");
   const label = btn.textContent;
-  btn.disabled = true; btn.textContent = "Verifying & creating…";
+  btn.disabled = true; btn.textContent = "Creating account…";
   try {
+    const payload = {
+      name,
+      email,
+      phone,
+      password,
+      role: rgRole,
+    };
+    if (rgRole === "doctor") {
+      payload.specialty = $("#rgSpecialty").value || "General Medicine";
+      payload.fee = Number($("#rgFee").value || 500);
+    }
     const res = await api("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({
-        name: $("#rgName").value.trim(),
-        email: $("#rgEmail").value.trim(),
-        phone: $("#rgPhone").value.trim(),
-        password: $("#rgPass").value,
-        channel: rgChannel,
-        email_otp: $("#rgEmailOtp").value.trim(),
-        sms_otp: $("#rgSmsOtp").value.trim(),
-      }),
+      body: JSON.stringify(payload),
     });
     if (res.token) localStorage.setItem("medicare_token", res.token);
     state.user = res.user;
-    authNote(`Account verified & created — welcome, ${res.user.name}!`, true);
+    if (rgRole === "doctor") {
+      await loadDoctors(true).catch(() => {});
+      populateSpecialtyFilter();
+      populateEmgSpecialties();
+      renderHomeDoctors(state.allDoctors);
+    }
+    authNote(`Account created — welcome, ${res.user.name}!`, true);
     await afterAuth();
-    toast(`✅ Verified account created for ${res.user.name}`, "success");
+    toast(`✅ ${res.user.role === "doctor" ? "Doctor" : "Patient"} account created for ${res.user.name}`, "success");
     setTimeout(() => finishAuth(true), 300);
   } catch (err) {
     authNote(err.message);
@@ -1301,7 +1265,8 @@ $("#shiftSave").addEventListener("click", async (e) => {
 
 /* ================================== ADMIN ====================================== */
 async function loadStats() {
-  const s = await api("/api/stats");
+  const url = state.user?.role === "doctor" ? "/api/stats?scope=doctor" : "/api/stats";
+  const s = await api(url);
   $("#aTotal").textContent = s.total;
   $("#aConfirmed").textContent = s.confirmed;
   $("#aCompleted").textContent = s.completed;
@@ -1319,22 +1284,34 @@ function hideAdminGate() {
   $("#adminGate").hidden = true;
 }
 $("#adminSignin").addEventListener("click", async () => {
-  const note = state.user ? `You're signed in as ${state.user.name}. Sign in with an admin account below.` : "";
+  const note = state.user ? `You're signed in as ${state.user.name}. Sign in with a Doctor or Admin account below.` : "";
   const ok = await showAuth(note, { force: true, mode: "admin", tone: "info" });
-  if (ok && state.user?.role !== "admin")
-    showAdminGate("That account does not have administrator privileges. Sign in with an admin account.");
+  if (ok && state.user?.role !== "admin" && state.user?.role !== "doctor")
+    showAdminGate("That account is a patient account. Sign in with a Doctor or Admin account.");
   else loadAdmin();
 });
 
 async function loadAdmin() {
   if (!state.user) {
-    showAdminGate("The admin panel lists every booking and manages the doctor team — it needs an admin account.");
+    showAdminGate("The Staff / Doctor panel requires a Doctor or Admin account.");
     return;
   }
-  if (state.user.role !== "admin") {
-    showAdminGate(`You're signed in as ${state.user.name} (patient). Admin access is required for this panel.`);
+  const isDoctor = state.user.role === "doctor";
+  const isAdmin = state.user.role === "admin";
+  if (!isAdmin && !isDoctor) {
+    showAdminGate(`You're signed in as ${state.user.name} (patient). Doctor or Admin access is required for this panel.`);
     return;
   }
+  if ($("#adminPanelTitle")) $("#adminPanelTitle").textContent = isDoctor ? "Doctor panel" : "Admin panel";
+  if ($("#adminPanelSub")) {
+    $("#adminPanelSub").textContent = isDoctor
+      ? "View and manage patient appointments booked with you, and update your clinic profile."
+      : "Every booking in one place — create, read, update and delete.";
+  }
+  if ($("#docMgmtTitle")) $("#docMgmtTitle").textContent = isDoctor ? "My doctor profile" : "Manage doctors";
+  if ($("#adminDoctor")) $("#adminDoctor").hidden = isDoctor;
+  if ($("#addDoctorBtn")) $("#addDoctorBtn").hidden = isDoctor;
+
   hideAdminGate();
   await loadStats();
   loadDoctorMgmt();
@@ -1344,7 +1321,7 @@ async function loadAdmin() {
   const doc = $("#adminDoctor").value;
   if (q) params.set("search", q);
   if (st && st !== "all") params.set("status", st);
-  if (doc) params.set("doctorId", doc);
+  if (!isDoctor && doc) params.set("doctorId", doc);
 
   const tbody = $("#adminRows");
   tbody.innerHTML = `<tr><td colspan="7" class="muted center">Loading…</td></tr>`;
@@ -1491,11 +1468,15 @@ async function loadDoctorMgmt() {
     grid.innerHTML = `<p class="muted">${esc(err.message)}</p>`;
     return;
   }
-  if (!state.allDoctors.length) {
-    grid.innerHTML = `<p class="muted">No doctors yet — add your first specialist.</p>`;
+  const isDoctor = state.user?.role === "doctor";
+  const visible = isDoctor
+    ? state.allDoctors.filter((d) => Number(d.id) === Number(state.user.doctor_id))
+    : state.allDoctors;
+  if (!visible.length) {
+    grid.innerHTML = `<p class="muted">${isDoctor ? "No linked doctor profile found yet." : "No doctors yet — add your first specialist."}</p>`;
     return;
   }
-  grid.innerHTML = state.allDoctors.map((d, i) => `
+  grid.innerHTML = visible.map((d, i) => `
     <article class="doc-mgmt-card">
       <div class="doc-mgmt-top">
         <div class="avatar" style="background:${AVATAR_COLORS[i % AVATAR_COLORS.length]}">${initials(d.name)}</div>
@@ -1511,7 +1492,7 @@ async function loadDoctorMgmt() {
       ${d.bio ? `<p class="doc-mgmt-bio">${esc(d.bio)}</p>` : ""}
       <div class="doc-mgmt-actions">
         <button class="btn btn-ghost btn-sm" data-doc-edit="${d.id}">✎ Edit</button>
-        <button class="btn btn-ghost btn-sm" data-doc-del="${d.id}">🗑 Delete</button>
+        ${isDoctor ? "" : `<button class="btn btn-ghost btn-sm" data-doc-del="${d.id}">🗑 Delete</button>`}
       </div>
     </article>`).join("");
 }
