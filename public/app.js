@@ -2190,24 +2190,6 @@ async function alexHandle(text, alreadyEchoed = false) {
   );
 }
 
-async function checkDbStatus() {
-  try {
-    const res = await api("/api/db-status");
-    const pill = $("#dbStatusPill");
-    if (!pill) return;
-    if (res.mongodb?.status === "connected") {
-      const dbName = res.mongodb.database || "MongoDB";
-      pill.innerHTML = `<span class="dot green"></span> MongoDB (${esc(dbName)})`;
-      pill.title = `MongoDB Atlas connected (${dbName}) in ${res.mongodb.connectMs ?? "?"}ms`;
-      pill.className = "db-pill live";
-    } else {
-      pill.innerHTML = `<span class="dot orange"></span> SQLite Active`;
-      pill.title = `SQLite active; MongoDB offline${res.mongodb?.error ? ": " + res.mongodb.error : ""}`;
-      pill.className = "db-pill fallback";
-    }
-  } catch {}
-}
-
 /* ============================ MOTION / MICRO-INTERACTIONS ==================== */
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 let revealQueued = false;
@@ -2731,5 +2713,4 @@ function initSandbox() {
   initFaq();
   window.addEventListener("scroll", scheduleReveal, { passive: true });
   window.addEventListener("resize", scheduleReveal);
-  checkDbStatus();
 })();
